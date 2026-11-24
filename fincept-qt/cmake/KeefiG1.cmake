@@ -198,6 +198,7 @@ target_sources(keefi_ui PRIVATE
     src/keefi/LocalWindowSession.cpp
     src/keefi/LocalWindowOptions.cpp
     src/keefi/LocalWindowHelpers.cpp src/keefi/LocalWindowHelpers_p.h)
+target_sources(keefi_ui PRIVATE src/keefi/ReleaseUpdater.cpp src/keefi/ReleaseUpdater.h src/keefi/ReleaseUpdateManifest.cpp)
 target_sources(keefi_ui PRIVATE src/keefi/KeefiTheme.cpp src/keefi/KeefiTheme.h
     src/keefi/KeefiFonts.cpp src/keefi/KeefiFonts.h resources/keefi_fonts.qrc resources/keefi_notices.qrc)
 target_sources(keefi_ui PRIVATE src/keefi/VaultGate.cpp src/keefi/VaultGate.h
@@ -255,11 +256,11 @@ add_executable(keefi-collector src/keefi/collector/collector_main.cpp
 target_link_libraries(keefi-collector PRIVATE keefi_trading Qt6::Core Qt6::Network Qt6::WebSockets)
 target_include_directories(keefi-collector PRIVATE src)
 target_compile_definitions(keefi-collector PRIVATE KEEFI_COLLECTOR_REVISION="coinflow@${_keefi_collector_revision}")
-set(KEEFI_RELEASE_VERSION "0.18.0")
-set(KEEFI_RELEASE_BUILD "111")
+set(KEEFI_RELEASE_VERSION "0.18.1")
+set(KEEFI_RELEASE_BUILD "112")
 qt_add_executable(KEEFI MACOSX_BUNDLE WIN32 src/keefi/main.cpp)
 target_link_libraries(KEEFI PRIVATE keefi_ui keefi_security)
-target_compile_definitions(KEEFI PRIVATE KEEFI_APPLICATION_VERSION="${KEEFI_RELEASE_VERSION}")
+target_compile_definitions(KEEFI PRIVATE KEEFI_RELEASE_BUILD_NUMBER=${KEEFI_RELEASE_BUILD} KEEFI_APPLICATION_VERSION="${KEEFI_RELEASE_VERSION}")
 set_target_properties(KEEFI PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME "KEEFI"
     MACOSX_BUNDLE_GUI_IDENTIFIER "xyz.beamgrove.keefi.local"
@@ -295,6 +296,14 @@ foreach(_target keefi_vault keefi_security keefi_trading keefi_ui KEEFI KEEFI_De
         target_compile_options(${_target} PRIVATE "$<$<COMPILE_LANGUAGE:CXX,OBJCXX>:-Wall;-Wextra;-Wpedantic>")
     endif()
 endforeach()
+
+if(APPLE)
+    target_sources(keefi_ui PRIVATE src/keefi/UpdateInstallMac.cpp)
+    include(cmake/KeefiUpdateMac.cmake)
+elseif(WIN32)
+    target_sources(keefi_ui PRIVATE src/keefi/UpdateInstallWindows.cpp)
+    include(cmake/KeefiUpdateWindows.cmake)
+endif()
 
 if(KEEFI_BUILD_TESTS)
     enable_testing()

@@ -104,6 +104,7 @@ class ListDetailView;
 class PublicMarketCatalog;
 class ValuationPreferences;
 class VaultGate;
+class ReleaseUpdater;
 
 enum class StockChartConnectionState;
 enum class BackupRestoreOutcome { Failed, Restored, PreparedForRestart };
@@ -127,6 +128,7 @@ class LocalWindow final : public QMainWindow {
     // Normal quit only, capped at 3 seconds. Completion reports save status but
     // never vetoes closing. Security lock bypasses preparation; cancel never waits.
     void setQuitPreparation(std::function<void(std::function<void(bool)>)>, std::function<void()> cancel = {});
+    void setReleaseUpdater(ReleaseUpdater* updater, std::function<bool(QString*)> startInstaller);
     void setPortfolioController(PortfolioController* controller);
     void setPortfolioStreamGraceMs(int ms) { portfolioStreamGraceMs_ = qMax(0, ms); }
     // Public exploration tab (default home). autoLoad=false avoids network reads, e.g. in start checks.
@@ -206,6 +208,7 @@ class LocalWindow final : public QMainWindow {
     void syncConnectionLayout();
     void closeSensitiveDialog();
     void requestQuit();
+    void finishPreparedQuit(bool saved);
     void applyLocalTheme();
     void restoreMovementColors();
     void restoreMoneyCurrency();
@@ -308,6 +311,9 @@ class LocalWindow final : public QMainWindow {
     AccountModel& accounts_;
     bool securityReady_ = false;
     bool quitting_ = false;
+    ReleaseUpdater* releaseUpdater_ = nullptr;
+    std::function<bool(QString*)> startUpdateInstaller_;
+    bool restartingForUpdate_ = false;
     bool quitPreparing_ = false;
     std::function<void(std::function<void(bool)>)> quitPreparation_;
     std::function<void()> quitCancellation_;

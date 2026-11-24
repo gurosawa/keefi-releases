@@ -25,12 +25,14 @@ class VaultGate final : public QWidget {
     void setSecurityReady(bool ready);
     void clearSensitiveInputs();
     void resetPresentation();
+    void setUpdateAvailable(bool available);
     void setOperationError(const QString& error);
   public slots:
     // Also the QFileDialog::fileSelected boundary; paths are never displayed.
     void selectBackup(const QString& path);
   signals:
     void browseRequested();
+    void updateRequested();
     void submitted(int mode, const QString& currentPassword, const QString& newPassword, const QString& backupPath);
   protected:
     void hideEvent(QHideEvent*) override;
@@ -49,6 +51,7 @@ class VaultGate final : public QWidget {
     QPushButton* backup_=nullptr;
     QPushButton* cancelRestore_=nullptr;
     QPushButton* browse_=nullptr;
+    QPushButton* update_=nullptr;
     VaultDialog *create_=nullptr, *unlock_=nullptr, *restore_=nullptr;
     QPointer<QFileDialog> chooser_;
 };

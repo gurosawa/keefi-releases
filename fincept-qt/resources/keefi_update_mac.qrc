@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/keefi/update">
+    <file alias="restart.applescript">keefi/update/restart.applescript</file>
+    <file alias="replace.sh">keefi/update/replace.sh</file>
+  </qresource>
+</RCC>

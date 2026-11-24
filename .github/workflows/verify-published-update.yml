@@ -1,0 +1,50 @@
+name: Verify published Windows update
+on:
+  workflow_dispatch:
+    inputs:
+      build_run:
+        description: Successful Windows candidate run for this commit
+        type: string
+        required: true
+      previous_version:
+        description: Version of an older installation
+        type: string
+        required: true
+      previous_build:
+        description: Build of an older installation
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  live-update:
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - name: Verify the public download using the built-in release key
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.build_run }}
+          PREVIOUS_VERSION: ${{ inputs.previous_version }}
+          PREVIOUS_BUILD: ${{ inputs.previous_build }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ($env:BUILD_RUN -notmatch '^[0-9]+$' -or $env:PREVIOUS_BUILD -notmatch '^[0-9]+$' -or
+              $env:PREVIOUS_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid build reference' }
+          $job = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:BUILD_RUN" | ConvertFrom-Json
+          if ($job.head_sha -ne $env:GITHUB_SHA -or $job.conclusion -ne 'success' -or
+              $job.path -ne '.github/workflows/windows-candidate.yml') { throw 'Candidate run does not match this commit' }
+          $work = Join-Path $env:RUNNER_TEMP 'keefi-public-update'
+          gh run download $env:BUILD_RUN --repo $env:GITHUB_REPOSITORY --name keefi-windows-x64 --dir "$work/dist"
+          gh run download $env:BUILD_RUN --repo $env:GITHUB_REPOSITORY --name keefi-windows-update-probe --dir "$work/probe"
+          $zip = @(Get-ChildItem "$work/dist" -Filter '*-windows-x64.zip')
+          $probe = @(Get-ChildItem "$work/probe" -Recurse -Filter keefi_update_probe.exe)
+          if ($zip.Count -ne 1 -or $probe.Count -ne 1) { throw 'Missing candidate ZIP or probe' }
+          Expand-Archive -LiteralPath $zip[0].FullName -DestinationPath "$work/runtime"
+          Copy-Item $probe[0].FullName "$work/runtime/KEEFI/keefi_update_probe.exe"
+          Remove-Item Env:GH_TOKEN
+          & "$work/runtime/KEEFI/keefi_update_probe.exe" $env:PREVIOUS_VERSION $env:PREVIOUS_BUILD
+          if ($LASTEXITCODE -ne 0) { throw 'Public update verification failed' }

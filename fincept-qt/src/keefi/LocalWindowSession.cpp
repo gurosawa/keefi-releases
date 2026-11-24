@@ -446,6 +446,8 @@ void LocalWindow::showVaultGate() {
         startupStack_->addWidget(workbenchRoot_);
         vaultGate_=new VaultGate(vault_.exists(),QFileInfo(vault_.filePath()).lastModified(),startupStack_);
         startupStack_->addWidget(vaultGate_);
+        vaultGate_->setUpdateAvailable(releaseUpdater_ != nullptr);
+        connect(vaultGate_, &VaultGate::updateRequested, this, [this] { openOptionsPage("optionsGeneral"); });
         connect(vaultGate_,&VaultGate::browseRequested,this,[this]{lockAndClear();leaveVaultGate(true);});
         connect(vaultGate_,&VaultGate::submitted,this,[this](int mode,const QString& current,const QString& next,const QString& backupPath){
             emit securityCheckRequested();

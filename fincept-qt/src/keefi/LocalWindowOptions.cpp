@@ -1,4 +1,5 @@
 #include "keefi/LocalWindow.h"
+#include "keefi/ReleaseUpdater.h"
 #include "keefi/LocalWindowHelpers_p.h"
 #include "keefi/ProfileSettings.h"
 #include "keefi/UsabilityPresentation.h"
@@ -366,6 +367,30 @@ void LocalWindow::openOptionsPage(const QString& page, const QString& listId) {
         page->addWidget(note(tr("창을 닫으면 메뉴 막대 아이콘으로 계속 실행해요."), dialog));
         page->addWidget(mirrorCheck(keepAwake_, "optionKeepAwake"));
         page->addWidget(note(keepAwake_->toolTip(), dialog));
+        if (releaseUpdater_) {
+            page->addSpacing(12);
+            auto* status = note({}, dialog);
+            status->setObjectName("releaseUpdateStatus");
+            page->addWidget(status);
+            auto* row = new QHBoxLayout;
+            auto* check = button(tr("업데이트 확인"), "checkReleaseUpdate", dialog);
+            auto* restart = button(tr("업데이트 후 재시작"), "restartForUpdate", dialog);
+            row->addWidget(check);
+            row->addWidget(restart);
+            row->addStretch();
+            page->addLayout(row);
+            const auto refresh = [this, status, check, restart] {
+                using State = ReleaseUpdater::State;
+                const auto state = releaseUpdater_->state();
+                status->setText(releaseUpdater_->status());
+                check->setEnabled(state != State::Checking && state != State::Downloading && state != State::Ready);
+                restart->setEnabled(state == State::Available);
+            };
+            connect(releaseUpdater_, &ReleaseUpdater::changed, dialog, refresh);
+            connect(check, &QPushButton::clicked, releaseUpdater_, &ReleaseUpdater::check);
+            connect(restart, &QPushButton::clicked, releaseUpdater_, &ReleaseUpdater::download);
+            refresh();
+        }
         page->addStretch();
     }
     {

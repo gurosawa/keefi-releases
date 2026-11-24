@@ -2,6 +2,10 @@
 
 KEEFI는 Fincept Terminal v4.5.1을 수정한 AGPL-3.0-or-later 프로젝트입니다. Windows x64 ZIP 안의 `KEEFI/LICENSE`와 `NOTICE`에 라이선스 전문과 원저작자 고지가 들어 있습니다. 같은 버전의 소스와 빌드 스크립트는 해당 릴리스에서 받을 수 있습니다. [KEEFI Releases](https://github.com/gurosawa/keefi-releases/releases)
 
+## macOS Intel 배포본
+
+`KEEFI.app/Contents/Resources`에 LICENSE·NOTICE, Qt LGPL/GPL 및 구성 요소 고지, 폰트 라이선스, 정적 링크한 libsodium 1.0.22의 ISC 라이선스, 공식 Qt 6.8.3의 Qt Base/WebSockets SPDX 문서를 제공합니다. QtGui·Cocoa의 접근성 보완에 사용한 패치도 함께 배포합니다. macOS 시스템 zlib와 iconv는 운영체제에서 제공합니다. [Qt 변경 소스와 빌드 절차](patches/README.md)
+
 ## Windows 배포본
 
 경로는 압축을 푼 `KEEFI` 폴더 기준입니다. 앱은 Qt DLL을 동적으로 로드하며 호환되는 수정본으로 교체할 수 있습니다.

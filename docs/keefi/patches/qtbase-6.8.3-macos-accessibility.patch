@@ -1,0 +1,273 @@
+--- a/src/gui/accessible/qaccessiblecache_p.h
++++ b/src/gui/accessible/qaccessiblecache_p.h
+@@ -43,7 +43,7 @@
+ 
+ #ifdef Q_OS_APPLE
+     QT_MANGLE_NAMESPACE(QMacAccessibilityElement) *elementForId(QAccessible::Id axid) const;
+-    void insertElement(QAccessible::Id axid, QT_MANGLE_NAMESPACE(QMacAccessibilityElement) *element) const;
++    bool insertElement(QAccessible::Id axid, QT_MANGLE_NAMESPACE(QMacAccessibilityElement) *element) const;
+ #endif
+ 
+ private Q_SLOTS:
+--- a/src/gui/accessible/qaccessiblecache_mac.mm
++++ b/src/gui/accessible/qaccessiblecache_mac.mm
+@@ -2,24 +2,45 @@
+ // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
+ 
+ #include "qaccessiblecache_p.h"
++#include <QtCore/private/qcore_mac_p.h>
+ 
+ // qcocoaaccessibilityelement.h in platform plugin
+-@interface QT_MANGLE_NAMESPACE(QMacAccessibilityElement)
++QT_DECLARE_NAMESPACED_OBJC_INTERFACE(QMacAccessibilityElement, NSObject
+ - (void)invalidate;
+-@end
++)
+ 
+ QT_BEGIN_NAMESPACE
+ 
+-void QAccessibleCache::insertElement(QAccessible::Id axid, QT_MANGLE_NAMESPACE(QMacAccessibilityElement) *element) const
++bool QAccessibleCache::insertElement(QAccessible::Id axid,
++                                     QT_MANGLE_NAMESPACE(QMacAccessibilityElement) *element) const
+ {
+-    accessibleElements[axid] = element;
++    if (const auto it = accessibleElements.find(axid); it == accessibleElements.end()) {
++        accessibleElements[axid] = element;
++        [element retain];
++        return true;
++    } else if (it.value() != element) {
++        auto *oldElement = it.value();
++        // this might invalidate the iterator
++        [oldElement invalidate];
++        [oldElement release];
++
++        accessibleElements[axid] = element;
++        [element retain];
++        return true;
++    }
++    return false;
+ }
+ 
+ void QAccessibleCache::removeAccessibleElement(QAccessible::Id axid)
+ {
+-    QT_MANGLE_NAMESPACE(QMacAccessibilityElement) *element = elementForId(axid);
+-    [element invalidate];
+-    accessibleElements.remove(axid);
++    // Some QAccessibleInterface instances in the cache didn't get created in
++    // response to a query, but when we emit events. So we might get called with
++    // and axid for which we don't have any element (yet).
++    if (QT_MANGLE_NAMESPACE(QMacAccessibilityElement) *element = elementForId(axid)) {
++        [element invalidate];
++        accessibleElements.remove(axid);
++        [element release];
++    }
+ }
+ 
+ QT_MANGLE_NAMESPACE(QMacAccessibilityElement) *QAccessibleCache::elementForId(QAccessible::Id axid) const
+--- a/src/plugins/platforms/cocoa/qcocoaaccessibilityelement.mm
++++ b/src/plugins/platforms/cocoa/qcocoaaccessibilityelement.mm
+@@ -125,57 +125,11 @@
+                 if (iface->tableInterface()) {
+                     [self updateTableModel];
+                 } else if (const auto *cell = iface->tableCellInterface()) {
+-                    // Called with role when populating a row with placeholder cells. The caller
+-                    // inserts us into the correct array, so we don't have to look for it.
+-                    if (role == NSAccessibilityCellRole)
+-                        return self;
+-                    // If we create an element for a table cell, initialize it with row/column
+-                    // and insert it into the corresponding row's columns array.
++                    // The native cache owns the canonical cell wrapper. Row arrays
++                    // attach it when their children are requested; creating a cell
++                    // here must not recursively populate the same row.
+                     m_rowIndex = cell->rowIndex();
+                     m_columnIndex = cell->columnIndex();
+-                    QAccessibleInterface *table = cell->table();
+-                    Q_ASSERT(table);
+-                    QAccessibleTableInterface *tableInterface = table->tableInterface();
+-                    if (tableInterface) {
+-                        auto *tableElement = [QMacAccessibilityElement elementWithInterface:table];
+-                        Q_ASSERT(tableElement);
+-                        if (!tableElement->rows
+-                         || int(tableElement->rows.count) <= m_rowIndex
+-                         || int(tableElement->rows.count) != tableInterface->rowCount()) {
+-                            qCWarning(lcAccessibilityTable)
+-                                       << "Cell requested for row" << m_rowIndex << "is out of"
+-                                       << "bounds for table with" << (tableElement->rows ?
+-                                            tableElement->rows.count : tableInterface->rowCount())
+-                                       << "rows! Resizing table model.";
+-                            [tableElement updateTableModel];
+-                        }
+-
+-                        Q_ASSERT(tableElement->rows);
+-                        Q_ASSERT(int(tableElement->rows.count) > m_rowIndex);
+-
+-                        auto *rowElement = tableElement->rows[m_rowIndex];
+-                        if (!rowElement->columns || int(rowElement->columns.count) != tableInterface->columnCount()) {
+-                            if (rowElement->columns) {
+-                                qCWarning(lcAccessibilityTable)
+-                                        << "Table representation column count is out of sync:"
+-                                        << rowElement->columns.count << "!=" << tableInterface->columnCount();
+-                            }
+-                            if (rowElement->columns) {
+-                                [rowElement->columns autorelease];
+-                                rowElement->columns = nil;
+-                            }
+-                            rowElement->columns = [rowElement populateTableRow:tableInterface->columnCount()];
+-                            [rowElement->columns retain];
+-                        }
+-
+-                        qCDebug(lcAccessibilityTable) << "Creating cell representation for"
+-                                                      << m_rowIndex << m_columnIndex
+-                                                      << "in table with"
+-                                                      << tableElement->rows.count << "rows and"
+-                                                      << rowElement->columns.count << "columns";
+-
+-                        rowElement->columns[m_columnIndex] = self;
+-                    }
+                 }
+             }
+         }
+@@ -184,6 +138,15 @@
+     return self;
+ }
+ 
++/*!
++    \internal
++
++    Constructs a new element with the ID \a anId and inserts it into the cache.
++
++    Elements representing table rows, columns, and cells are created directly
++    via initWithId (in populateTableArray and populateTableRow), as they don't
++    get added to the cache until later.
++*/
+ + (instancetype)elementWithId:(QAccessible::Id)anId
+ {
+     Q_ASSERT(anId);
+@@ -196,7 +159,8 @@
+     if (!element) {
+         Q_ASSERT(QAccessible::accessibleInterface(anId));
+         element = [[self alloc] initWithId:anId];
+-        cache->insertElement(anId, element);
++        if (cache->insertElement(anId, element))
++            [element release];
+     }
+     return element;
+ }
+@@ -211,8 +175,10 @@
+     return [self elementWithId:anId];
+ }
+ 
+-// called by QAccessibleCache::removeAccessibleElement
++// called by QAccessibleCache::removeAccessibleElement, which also releases
+ - (void)invalidate {
++    if (!axid)
++        return;
+     axid = 0;
+     if (rows) {
+         [rows autorelease];
+@@ -225,10 +191,18 @@
+     synthesizedRole = nil;
+ 
+     NSAccessibilityPostNotification(self, NSAccessibilityUIElementDestroyedNotification);
+-    [self release];
+-}
+-
++}
++
++// The view and accessibility cache own the interfaces. Native element teardown
++// must not delete interfaces that the table still references.
+ - (void)dealloc {
++    if (axid && self.isManagedByParent) {
++        // Synthetic rows and columns are owned by their arrays, not the cache.
++        // Mark the interface unavailable before notifying observers at teardown.
++        axid = 0;
++        synthesizedRole = nil;
++        NSAccessibilityPostNotification(self, NSAccessibilityUIElementDestroyedNotification);
++    }
+     if (rows)
+         [rows release]; // will also release all entries first
+     if (columns)
+@@ -237,16 +211,14 @@
+ }
+ 
+ - (BOOL)isEqual:(id)object {
+-    if ([object isKindOfClass:[QMacAccessibilityElement class]]) {
+-        QMacAccessibilityElement *other = object;
+-        return other->axid == axid && other->synthesizedRole == synthesizedRole;
+-    } else {
+-        return NO;
+-    }
++    // Cell wrappers are canonical. Synthetic rows and columns, including new
++    // generations at the same index, must remain distinct native objects.
++    return self == object;
+ }
+ 
+ - (NSUInteger)hash {
+-    return axid;
++    // The native identity must survive invalidation of the Qt interface ID.
++    return [super hash];
+ }
+ 
+ - (BOOL)isManagedByParent {
+@@ -282,28 +254,26 @@
+ {
+     Q_ASSERT(synthesizedRole == NSAccessibilityRowRole);
+     qCDebug(lcAccessibilityTable) << "Populating table row" << m_rowIndex
+-                                  << "with" << count << "placeholder cells";
+-    // When macOS asks for the children of a row, then we populate the row's column
+-    // array with synthetic elements as place holders. This way, we don't have to
+-    // create QAccessibleInterfaces for every cell before they are really needed.
+-    // We don't add those synthetic elements into the cache, and we give them the
+-    // same axid as the table. This way, we can get easily to the table, and from
+-    // there to the QAccessibleInterface for the cell, when we have to eventually
+-    // associate such an interface with the element (at which point it is no longer
+-    // a placeholder).
++                                  << "with" << count << "canonical cells";
+     auto *array = [NSMutableArray<QMacAccessibilityElement *> arrayWithCapacity:count];
+     Q_ASSERT(array);
+ 
++    QAccessibleInterface *iface = self.qtInterface;
++    QAccessibleTableInterface *table = iface ? iface->tableInterface() : nullptr;
++    if (!table || m_rowIndex < 0 || m_rowIndex >= table->rowCount())
++        return array;
++
++    // Resolve only the requested row. Reuse the cache's native cell so row,
++    // column, and selection queries cannot create competing wrappers for one
++    // interface and invalidate a wrapper still held by a live native array.
+     for (int n = 0; n < count; ++n) {
+-        // columns will have same axid as table (but not inserted in cache)
++        QAccessibleInterface *cellInterface = table->cellAt(m_rowIndex, n);
++        if (!cellInterface || !cellInterface->isValid())
++            continue;
+         QMacAccessibilityElement *cell =
+-                [[QMacAccessibilityElement alloc] initWithId:axid role:NSAccessibilityCellRole];
+-        if (cell) {
+-            cell->m_rowIndex = m_rowIndex;
+-            cell->m_columnIndex = n;
+-            [array addObject:cell];
+-            [cell release];
+-        }
++                [QMacAccessibilityElement elementWithInterface:cellInterface];
++        if (cell)
++            [array addObject:cell]; // The factory returns a borrowed cache-owned object.
+     }
+     return array;
+ }
+@@ -583,12 +553,13 @@
+ 
+             // parent of cell should be row
+             int rowIndex = -1;
+-            if (m_rowIndex >= 0 && m_columnIndex >= 0)
++            if (QAccessibleTableCellInterface *cell = iface->tableCellInterface())
++                rowIndex = cell->rowIndex();
++            else if (m_rowIndex >= 0 && m_columnIndex >= 0)
+                 rowIndex = m_rowIndex;
+-            else if (QAccessibleTableCellInterface *cell = iface->tableCellInterface())
+-                rowIndex = cell->rowIndex();
+             Q_ASSERT(tableElement->rows);
+-            if (rowIndex > int([tableElement->rows count]) || rowIndex == -1)
++            if (!tableElement->rows || rowIndex < 0
++                    || rowIndex >= int([tableElement->rows count]))
+                 return nil;
+             QMacAccessibilityElement *rowElement = tableElement->rows[rowIndex];
+             return NSAccessibilityUnignoredAncestor(rowElement);

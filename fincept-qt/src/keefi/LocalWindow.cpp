@@ -10,6 +10,7 @@
 #include "keefi/Vault.h"
 #include "keefi/VaultDialog.h"
 #include "keefi/VaultGate.h"
+#include "keefi/ReleaseUpdater.h"
 #include <QFileInfo>
 #include "keefi/AssetsWindow.h"
 #include "keefi/RecordTransferDialog.h"
@@ -80,6 +81,7 @@
 #include <QStyle>
 #include <utility>
 #include <functional>
+#include <memory>
 #include <QAbstractItemModel>
 #include <QAbstractItemView>
 #include <QByteArray>
@@ -626,6 +628,16 @@ bool LocalWindow::eventFilter(QObject* watched,QEvent* event) {
     if(watched==QCoreApplication::instance()&&event->type()==QEvent::Quit&&quitPreparation_&&!quitting_){requestQuit();return true;}
     return QMainWindow::eventFilter(watched,event);
 }
+void LocalWindow::setReleaseUpdater(ReleaseUpdater* updater, std::function<bool(QString*)> startInstaller) {
+    releaseUpdater_ = updater;
+    startUpdateInstaller_ = std::move(startInstaller);
+    connect(updater, &ReleaseUpdater::archiveReady, this, [this] {
+        if (quitPreparing_ || quitting_) return;
+        restartingForUpdate_ = true;
+        requestQuit();
+    });
+}
+
 void LocalWindow::requestQuit() {
     if(quitting_||quitPreparing_)return;
     if(quitPreparation_){
@@ -633,24 +645,46 @@ void LocalWindow::requestQuit() {
         feedback_->setText(tr("종료 중이에요."));
         const QPointer<LocalWindow> guard(this);
         auto* deadline=new QTimer(this);deadline->setSingleShot(true);deadline->setTimerType(Qt::PreciseTimer);
-        const auto finish=[guard,deadline](bool){
-            if(!guard)return;
-            QTimer::singleShot(0,guard.data(),[guard,deadline]{
+        // A timeout can cancel a writer that also completes its callback. A late
+        // completion must never finish the next update attempt.
+        const auto completed = std::make_shared<bool>(false);
+        const auto finish=[guard,deadline,completed](bool saved){
+            if(!guard || std::exchange(*completed, true))return;
+            QTimer::singleShot(0,guard.data(),[guard,deadline,saved]{
                 if(!guard||!guard->quitPreparing_||guard->quitting_)return;
                 deadline->stop();deadline->deleteLater();guard->quitPreparing_=false;
-                guard->quitting_=true;guard->lockAndClear();emit guard->quitRequested();guard->close();
+                guard->finishPreparedQuit(saved);
             });
         };
         connect(deadline,&QTimer::timeout,this,[guard,finish]{
             if(!guard||!guard->quitPreparing_||guard->quitting_)return;
-            if(guard->quitCancellation_)guard->quitCancellation_();
             finish(false);
+            if(guard->quitCancellation_)guard->quitCancellation_();
         });
         deadline->start(3000);quitPreparation_(finish);
         return;
     }
-    quitting_ = true;
+    finishPreparedQuit(true);
+}
+
+void LocalWindow::finishPreparedQuit(bool saved) {
+    if (restartingForUpdate_ && !saved) {
+        restartingForUpdate_ = false;
+        feedback_->clear();
+        releaseUpdater_->refuse(tr("작업을 저장하지 못해 업데이트를 중단했습니다. 다시 시도해 주세요."));
+        return;
+    }
     lockAndClear();
+    if (restartingForUpdate_) {
+        restartingForUpdate_ = false;
+        QString error;
+        if (!startUpdateInstaller_(&error)) {
+            releaseUpdater_->refuse(error.isEmpty() ? tr("업데이트 설치를 시작할 수 없습니다.") : error);
+            return;
+        }
+        releaseUpdater_->handoffComplete();
+    }
+    quitting_ = true;
     emit quitRequested();
     close();
 }

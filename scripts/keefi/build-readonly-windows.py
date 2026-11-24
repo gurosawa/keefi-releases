@@ -51,7 +51,7 @@ def deploy_dependencies(app, objdump, sdk_bins, env):
     """windeployqt handles Qt plugins. Resolve non-Qt imports such as zlib from the same SDKs."""
     system = Path(os.environ["SystemRoot"]) / "System32"
     root_dlls = {p.name.lower() for p in app.glob("*.dll")}
-    binaries = [app / "KEEFI.exe", *app.rglob("*.dll")]
+    binaries = [app / "KEEFI.exe", app / "KEEFIUpdate.exe", *app.rglob("*.dll")]
     while binaries:
         binary = binaries.pop()
         info = subprocess.check_output([objdump, "-p", binary], env=env).decode("utf-8", "replace")
@@ -183,9 +183,10 @@ def build_package(args):
     if args.zlib_library:
         config.append(f"-DZLIB_LIBRARY_RELEASE={args.zlib_library.resolve(strict=True)}")
     subprocess.run(config, env=env, check=True)
-    targets = ["KEEFI"]
+    targets = ["KEEFI", "KEEFIUpdate"]
     if not args.stage_only:
         targets.extend(f"tst_keefi_{suite}" for suite in SUITES)
+        targets.extend(("keefi_update_profile_probe", "keefi_update_probe", "tst_keefi_release_update"))
     subprocess.run([cmake, "--build", build, "--parallel", str(args.jobs), "--target", *targets], env=env, check=True)
     tests, failures = ({}, []) if args.stage_only else isolated_tests(build, env, qt / "plugins")
     binary = build / "KEEFI.exe"
@@ -200,6 +201,7 @@ def build_package(args):
         app = work / "KEEFI"
         app.mkdir()
         shutil.copy2(binary, app)
+        shutil.copy2(build / "KEEFIUpdate.exe", app)
         # The QWidget chart uses the raster paint engine. Optional shader compiler
         # and software OpenGL packages are unrelated to this build's runtime.
         subprocess.run([qt / "bin/windeployqt.exe", "--release", "--no-translations", "--compiler-runtime",
@@ -213,6 +215,9 @@ def build_package(args):
             require((app / relative).is_file(), f"Missing deployed runtime {relative}")
         deploy_dependencies(app, compiler / "objdump.exe", bins, env)
         bundle_notices(app, qt, compiler, args.zlib_root)
+        inventory = app / "keefi-package-files.txt"
+        owned = sorted([path.relative_to(app).as_posix() for path in app.rglob("*") if path.is_file()] + [inventory.name])
+        inventory.write_text("\n".join(owned) + "\n", encoding="ascii")
         archive = work / f"{stem}.zip"
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as z:
             for path in sorted(app.rglob("*")):

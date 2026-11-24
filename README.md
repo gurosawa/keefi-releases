@@ -4,7 +4,7 @@ KEEFI는 한국어 개인 PC용 통합 자산 조회 데스크톱 앱입니다. 
 
 **금융 조회 전용입니다.** 주문·정정·취소·공식 주문 테스트·지갑 서명·스왑 제출을 제공하지 않습니다. 설정이나 `KEEFI_READ_ONLY_BETA=OFF`로 거래 기능을 켤 수 없습니다. 주문 이력 조회와 과거 기록의 읽기 호환은 해당 구현 범위에서 유지합니다.
 
-Windows x64 테스트 배포본은 [GitHub Releases](https://github.com/gurosawa/keefi-releases/releases)에서 받습니다. 해당 버전의 자산에서 Windows ZIP을 내려받아 폴더 전체를 압축 해제하고 `KEEFI.exe`를 실행하세요. 개발 도구 설치나 저장소 권한은 필요하지 않습니다. 서명되지 않은 후보이므로 PC의 보안 정책에 따라 실행이 차단될 수 있습니다.
+macOS Intel·Windows x64용 테스트 배포본은 [GitHub Releases](https://github.com/gurosawa/keefi-releases/releases)에서 받습니다. Mac에서는 ZIP의 `KEEFI.app`을 응용 프로그램 폴더에 복사한 뒤 실행하세요. Windows에서는 ZIP 전체를 쓰기 가능한 전용 폴더에 풀고 `KEEFI.exe`를 실행하세요. OS 보안 정책에 따라 실행 경고나 차단이 생길 수 있습니다. 0.18.1 (112)부터 앱에서 새 버전을 확인하고 **업데이트 후 재시작**을 선택할 수 있습니다. [업데이트와 배포 서명](docs/keefi/DESKTOP-UPDATES.md)
 
 키움 REST 테스트는 국내주식 차트의 **증권 연결하기**에서 키움을 선택해 진행하세요. 앱에서 직접 두 키 파일을 불러오고 연결한 뒤, 보던 종목과 시간 간격으로 돌아오는지, 자산에 표시된 현금과 보유 수량이 증권사 화면과 일치하는지 확인할 수 있습니다. 금융 정보를 공개 이슈에 첨부하지 마세요.
 
@@ -80,7 +80,7 @@ KEEFI_PYTHON=/path/to/python3 \
 
 공개 시세 수집기는 `keefi-collector`, 기본 자료 위치는 `~/Library/Application Support/KEEFI-Collector/v1`입니다. 기존 수집 프로세스나 자료의 자동 이전은 포함하지 않습니다.
 
-정식 앱이 공개되면 **Releases**에서 변경 내역과 지원 Mac을 확인하고 새 버전을 직접 내려받아 설치합니다. 소스로 설치한 경우에는 원하는 버전의 태그에서 다시 빌드할 수 있습니다.
+**Releases**에서 버전별 변경 내역과 지원 플랫폼을 확인할 수 있습니다. 소스로 설치한 경우에는 원하는 버전의 태그에서 다시 빌드할 수 있습니다.
 
 ## 라이선스와 원본
 

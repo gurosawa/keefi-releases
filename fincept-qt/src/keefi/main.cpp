@@ -1,4 +1,6 @@
 #include "keefi/BuildPolicy.h"
+#include "keefi/ReleaseUpdater.h"
+#include "keefi/UpdateInstall.h"
 #include "keefi/KeefiFonts.h"
 #include "keefi/AccountModel.h"
 #include "keefi/LocalWindow.h"
@@ -61,6 +63,7 @@
 #include <QJsonObject>
 #include <QLockFile>
 #include <QMessageBox>
+#include <QNetworkAccessManager>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTimer>
@@ -313,6 +316,20 @@ int main(int argc, char* argv[]) {
     }
     // All borrowed backends/settings outlive the window and its queued setup.
     keefi::LocalWindow window(vault, accounts);
+#if (defined(Q_OS_MACOS) || defined(Q_OS_WIN)) && !defined(KEEFI_DEVELOPMENT_BUILD)
+    if (!smoke && !keefi::updatePlatform().isEmpty()) {
+        auto* updates = new keefi::ReleaseUpdater(QCoreApplication::applicationVersion(), KEEFI_RELEASE_BUILD_NUMBER,
+            keefi::updatePlatform(), new QNetworkAccessManager(&window), keefi::releaseUpdatePublicKey(), &window);
+        // Preserve the default profile resolver unless a profile was selected explicitly.
+        const QStringList restartArgs = explicitProfile ? QStringList{QStringLiteral("--profile-dir"), selected.directory}
+                                                       : QStringList{};
+        window.setReleaseUpdater(updates, [updates, restartArgs](QString* error) {
+            const auto asset = updates->asset();
+            return keefi::startUpdateInstaller(updates->archivePath(), asset.sha256Hex, asset.version,
+                                               asset.build, restartArgs, error);
+        });
+    }
+#endif
     if (!smoke) window.setBackupRestoreHandler([&](
         const QString& backupPath, const QString& password, QString* error) {
         using Outcome = keefi::BackupRestoreOutcome;

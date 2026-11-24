@@ -101,7 +101,12 @@ VaultGate::VaultGate(bool exists,const QDateTime&,QWidget* parent)
         QPainter painter(&arrow);painter.setFont(KeefiFonts::font(FontRole::Secondary14));painter.setPen(themeColors().accentText);
         painter.drawText(QRect(0,0,18,18),Qt::AlignCenter,QStringLiteral("→"));painter.end();browse_->setIcon(QIcon(arrow));
     });
-    footerLayout->addWidget(browse_);footerLayout->addStretch();
+    footerLayout->addWidget(browse_);
+    update_ = link(tr("앱 업데이트"), "vaultGateUpdate", footer);
+    update_->hide();
+    footerLayout->addWidget(update_);
+    footerLayout->addStretch();
+    connect(update_, &QPushButton::clicked, this, [this] { clearSensitiveInputs(); emit updateRequested(); });
     root->addWidget(footer);
     connect(backup_,&QPushButton::clicked,this,&VaultGate::chooseBackup);
     connect(cancelRestore_,&QPushButton::clicked,this,[this]{selectPage(exists_);});
@@ -154,6 +159,8 @@ void VaultGate::selectPage(bool existing){
     for(auto* form:{create_,unlock_,restore_})form->resetForm();backupPath_.clear();
     showForm(existing?unlock_:create_);refreshControls();
 }
+void VaultGate::setUpdateAvailable(bool available) { update_->setVisible(available); }
+
 void VaultGate::refreshControls(){
     const bool restore=forms_->currentWidget()==restore_,unlock=forms_->currentWidget()==unlock_;
     title_->setText(restore?tr("백업에서 복원"):unlock?tr("금고 열기"):tr("새 금고 만들기"));

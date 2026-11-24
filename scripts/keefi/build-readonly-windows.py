@@ -128,8 +128,11 @@ def run_tests(build, env):
         log.unlink(missing_ok=True)
         try:
             # A relative configfile avoids interpreting the colon in a Windows drive letter as a QPA option.
+            test_env = {**env, "QT_QPA_PLATFORM": platform}
+            if label == "market_candles_view_offscreen":
+                test_env["KEEFI_FIB_AXIS_CAPTURE_DIR"] = str(build / "packaging-fib-captures")
             code = subprocess.run([exe, *cases, "-o", f"{log},txt"], cwd=build,
-                                  env={**env, "QT_QPA_PLATFORM": platform}, timeout=480).returncode
+                                  env=test_env, timeout=480).returncode
         except (OSError, subprocess.TimeoutExpired) as error:
             code = None
             print(f"{label}: {error}", flush=True)
@@ -274,6 +277,17 @@ def build_package(args):
                 z.extractall(work / "unpacked")
             reports, smoke_failures = smoke_extracted(work / "unpacked/KEEFI", work, version)
             failures.extend(smoke_failures)
+            if failures and os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted":
+                # Preserve this exact package only inside the disposable runner so independent
+                # update/rollback checks can still report alongside a chart assertion failure.
+                diagnostic = output / "unverified"
+                diagnostic.mkdir(exist_ok=True)
+                scratch = diagnostic / f"{stem}-unverified.zip"
+                os.replace(archive, scratch)
+                (diagnostic / "candidate.json").write_text(json.dumps({
+                    "verified": False, "archive": scratch.name, "version": version, "build": revision,
+                    "sha256": hashlib.sha256(scratch.read_bytes()).hexdigest(),
+                }), encoding="utf-8")
             require(not failures, f"Windows candidate verification failed: {', '.join(failures)}")
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         checksum = work / (archive.name + ".sha256")

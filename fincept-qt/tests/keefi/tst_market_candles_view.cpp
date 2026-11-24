@@ -3588,18 +3588,34 @@ void MarketCandlesViewTest::fibLabelsUsePriceAxisAndKeepPriceGrid(){
     const auto hoverAxis=axisTexts(hovered,right());
     QVERIFY(hoverAxis.contains("0.382 1,173"));
     QVERIFY(std::abs(hoverAxis.value("0.382 1,173")-afterAxis.value("0.382 1,173"))>=16);
-    chart->repaint();
-    QTest::mouseMove(chart,QPoint(chart->width()/2,qRound(top+35)));
-    QCoreApplication::processEvents();
     const auto windowChart=[&]{
         const auto at=chart->mapTo(&f.view,QPoint());
         return f.view.screen()->grabWindow(f.view.winId(),at.x(),at.y(),chart->width(),chart->height()).toImage();
     };
+    chart->repaint();
+    const auto collision=windowChart();
+    QTest::mouseMove(chart,QPoint(chart->width()/2,qRound(top+35)));
+    QCoreApplication::processEvents();
+    QCoreApplication::sendPostedEvents(nullptr,QEvent::UpdateRequest);
     const auto strips=windowChart();
-    chart->setProperty("keefiNoStaticCache",true);chart->repaint();
+    // Isolate damage-region correctness. Both screen captures must use the
+    // same backing-store rasterizer, including the Windows font engine.
+    chart->repaint(chart->rect());
     const auto full=windowChart();
-    chart->setProperty("keefiNoStaticCache",false);
-    if(!strips.isNull())QCOMPARE(strips,full);
+    if(!strips.isNull()){
+        QVERIFY(!collision.isNull()&&!full.isNull());
+        QVERIFY(collision!=strips);
+        if(strips!=full&&!captureDir.isEmpty()){
+            const auto prefix=captureDir+(dark?"/fib-dark-":"/fib-light-");
+            strips.save(prefix+"strips.png");
+            full.save(prefix+"full.png");
+        }
+        QCOMPARE(strips,full);
+    }
+    CandleTextDevice away;chart->render(&away);
+    const auto awayAxis=axisTexts(away,right());
+    QVERIFY(awayAxis.contains("0.382 1,173"));
+    QCOMPARE(awayAxis.value("0.382 1,173"),afterAxis.value("0.382 1,173"));
 
     // A Fibonacci endpoint at the current price must leave both values visible.
     QApplication::sendEvent(chart,&leave);

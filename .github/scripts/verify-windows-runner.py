@@ -85,7 +85,17 @@ def verify():
     work = Path(os.environ["RUNNER_TEMP"]) / "keefi"
     build_script = ROOT / "scripts/keefi/build-windows-candidate.ps1"
     with without_local_dumps():
-        subprocess.run(["pwsh", "-NoProfile", "-NonInteractive", "-File", build_script, "-WorkDir", work], check=True)
+        build = subprocess.run(["pwsh", "-NoProfile", "-NonInteractive", "-File", build_script, "-WorkDir", work])
+        if build.returncode:
+            diagnostic = work / "dist/unverified/candidate.json"
+            if diagnostic.exists():
+                data = json.loads(diagnostic.read_bytes())
+                archive = diagnostic.parent / data["archive"]
+                assert data["verified"] is False and archive.parent == diagnostic.parent
+                verify_update = runpy.run_path(str(ROOT / ".github/scripts/verify-windows-update.py"))["verify"]
+                result = verify_update(work, archive, data)
+                print("Independent updater diagnostics:", json.dumps(result), flush=True)
+            build.check_returncode()
 
     dist = work / "dist"
     archive, = dist.glob("KEEFI-*-windows-x64.zip")

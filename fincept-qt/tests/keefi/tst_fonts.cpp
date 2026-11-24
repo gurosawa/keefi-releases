@@ -166,7 +166,7 @@ class FontsTest final : public QObject {
         QTest::newRow("project-notice") << QStringLiteral("NOTICE")
             << QByteArray("6b3b8106eee5d39fc6662eadbbdac0bc5debd296c01d3c885c3edc0dda692f37") << 1009;
         QTest::newRow("third-party-notices") << QStringLiteral("THIRD-PARTY-NOTICES.md")
-            << QByteArray("a9131ed6532b04fd1cc7f13bd00301980aad47c1c486b24fedac6198e796ce32") << 4981;
+            << QByteArray("367bf9bf13238cb3dc13120396f3384222e9f543845e5d8a667255b4116e7741") << 4042;
         QTest::newRow("font-sources") << QStringLiteral("font-sources.json")
             << QByteArray("1c9d4c8141f89037921276f6db4c218b4d57755e601f4f7487c32ec470bcae6f") << 4038;
     }

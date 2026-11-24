@@ -20,5 +20,7 @@ if __name__ == "__main__":
     fixture = runpy.run_path(str(scripts / "verify-windows-update.py"))["verify"]
     clean_policy = runpy.run_path(str(scripts / "verify-windows-runner.py"))["without_local_dumps"]
     with clean_policy():
-        checked = fixture(work, archive, receipt)
+        # The candidate job already covered tamper and rollback with these exact bytes.
+        # Exercise the signed public download from a single fresh, foreground-only 111 GUI.
+        checked = fixture(work, archive, receipt, inject_failures=False)
     print(json.dumps(checked, ensure_ascii=True))

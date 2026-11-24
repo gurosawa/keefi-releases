@@ -30,6 +30,16 @@ user.GetWindowThreadProcessId.argtypes = (wintypes.HWND,ctypes.POINTER(wintypes.
 user.IsWindowVisible.argtypes = (wintypes.HWND,)
 user.GetWindowTextW.argtypes = (wintypes.HWND,wintypes.LPWSTR,ctypes.c_int)
 user.PostMessageW.argtypes = (wintypes.HWND,wintypes.UINT,wintypes.WPARAM,wintypes.LPARAM)
+user.IsWindowEnabled.argtypes = (wintypes.HWND,)
+user.IsHungAppWindow.argtypes = (wintypes.HWND,)
+user.GetClassNameW.argtypes = (wintypes.HWND,wintypes.LPWSTR,ctypes.c_int)
+user.GetWindow.argtypes = (wintypes.HWND,wintypes.UINT)
+user.GetWindow.restype = wintypes.HWND
+user.WaitForInputIdle.argtypes = (wintypes.HANDLE,wintypes.DWORD)
+user.WaitForInputIdle.restype = wintypes.DWORD
+user.SendMessageTimeoutW.argtypes = (wintypes.HWND,wintypes.UINT,wintypes.WPARAM,wintypes.LPARAM,
+                                    wintypes.UINT,wintypes.UINT,ctypes.POINTER(ctypes.c_size_t))
+user.SendMessageTimeoutW.restype = ctypes.c_ssize_t
 
 
 def digest(file):
@@ -63,13 +73,56 @@ def window(exe, wanted_pid=None, exclude=0):
     return result[0] if result else None
 
 
+def fixture_windows(pid):
+    # Titles are collected only inside this synthetic process. Include hidden
+    # main windows so a tray transition can be distinguished from a worker
+    # still draining after the GUI was destroyed.
+    details=[]
+    def visit(hwnd, _):
+        value=wintypes.DWORD()
+        user.GetWindowThreadProcessId(hwnd,ctypes.byref(value))
+        if value.value!=pid: return True
+        title=ctypes.create_unicode_buffer(160)
+        cls=ctypes.create_unicode_buffer(128)
+        user.GetWindowTextW(hwnd,title,len(title))
+        user.GetClassNameW(hwnd,cls,len(cls))
+        visible=bool(user.IsWindowVisible(hwnd))
+        if title.value or visible:
+            details.append({"hwnd":int(hwnd),"class":cls.value,"title":title.value,
+                            "visible":visible,"enabled":bool(user.IsWindowEnabled(hwnd)),
+                            "hung":bool(user.IsHungAppWindow(hwnd)),"owner":user.GetWindow(hwnd,4) or 0})
+        return True
+    user.EnumWindows(window_callback(visit),0)
+    return details
+
+
+def require_ready_main(info):
+    hwnd,_,pid=info
+    process=kernel.OpenProcess(0x100000|0x1000,False,pid)
+    if not process: raise RuntimeError(f"Cannot inspect fixture GUI process {pid}")
+    try:
+        idle=user.WaitForInputIdle(process,15000)
+        response=ctypes.c_size_t()
+        # WM_NULL is answered by the real GUI thread. Visibility alone can
+        # precede initialization of the event loop and saved close policy.
+        responsive=user.SendMessageTimeoutW(hwnd,0,0,0,3,3000,ctypes.byref(response))
+        if idle!=0 or not responsive or not user.IsWindowEnabled(hwnd):
+            raise RuntimeError(f"Fixture GUI {pid} not ready (idle={idle}, responsive={responsive}, "
+                               f"windows={fixture_windows(pid)!r})")
+    finally:
+        kernel.CloseHandle(process)
+
+
 def await_window(exe, wanted_pid=None, exclude=0):
     end=time.monotonic()+35
     while time.monotonic()<end:
         item=window(exe,wanted_pid,exclude)
-        if item: return item
+        if item:
+            if exe is not None: require_ready_main(item)
+            return item
         time.sleep(.12)
-    raise RuntimeError("No visible window for the installed executable")
+    windows=fixture_windows(wanted_pid) if wanted_pid else []
+    raise RuntimeError(f"No visible target window (PID {wanted_pid}, windows={windows!r})")
 
 
 def stop_window(info):
@@ -85,7 +138,8 @@ def stop_window(info):
         if actual.value!=pid or not user.PostMessageW(hwnd,0x0010,0,0):
             raise RuntimeError(f"Cannot close the fixture main window for process {pid}")
         if kernel.WaitForSingleObject(handle,30000)!=0:
-            raise RuntimeError(f"Fixture main window did not exit normally (PID {pid})")
+            raise RuntimeError(f"Fixture main window did not exit normally (PID {pid}, "
+                               f"windows={fixture_windows(pid)!r})")
         code=wintypes.DWORD()
         if not kernel.GetExitCodeProcess(handle,ctypes.byref(code)) or code.value!=0:
             raise RuntimeError(f"Fixture main window exited with code {code.value} (PID {pid})")
@@ -158,7 +212,7 @@ def helper_process(driver, env, old, exe, archive, sha, version, build, profile,
         return DetachedUpdater(int(output.readline().strip()))
 
 
-def verify(work, archive, data):
+def verify(work, archive, data, *, inject_failures=True):
     with update_fixture_directory(work) as temp:
         base=temp/BASE
         subprocess.run(["curl.exe","--fail","--silent","--show-error","--location","--retry","3","--output",base,BASE_URL],
@@ -188,9 +242,6 @@ def verify(work, archive, data):
         subprocess.run([probe,"seed",profile],env=test_env,check=True)
         vault=profile/"credentials.keefi-vault"; marker=profile/".keefi-profile.json"
         before=(digest(vault),digest(marker))
-        tampered=temp/"tampered.zip"
-        shutil.copy2(archive,tampered)
-        with tampered.open("ab") as f: f.write(b"tamper")
         system=Path(os.environ["SystemRoot"])
         env={k:v for k,v in os.environ.items() if not k.upper().startswith(("QT_","QML","KEEFI_","FINIX_"))}
         env.update(PATH=os.pathsep.join(map(str,(system/"System32",system))),QT_QPA_PLATFORM="windows")
@@ -198,28 +249,32 @@ def verify(work, archive, data):
         old=subprocess.Popen([exe,"--profile-dir",profile],cwd=temp,env=env)
         try:
             original=await_window(exe,old.pid)
-            print("Checking tampered archive against a running 111 application",flush=True)
-            helper_process(driver,test_env,old,exe,tampered,data["sha256"],data["version"],data["build"],profile,"tamper")
-            assert digest(exe)==old_exe_hash and before==(digest(vault),digest(marker))
-            # Refuse to overwrite a busy existing package component after some
-            # preceding files have been replaced, then relaunch the old app.
-            busy=kernel.CreateFileW(str(app/"Qt6Widgets.dll"),0x80000000,1,None,3,0,None)
-            assert busy and busy!=wintypes.HANDLE(-1).value
-            try:
-                print("Checking replacement rollback with a locked package DLL",flush=True)
-                fail=helper_process(driver,test_env,old,exe,archive,data["sha256"],data["version"],data["build"],profile,"rollback")
-                helpers.append(fail)
-                stop_window(original)
-                restored=await_window(exe,exclude=old.pid)
-                notice=await_window(None,fail.pid);user.PostMessageW(notice[0],0x0010,0,0)
-                assert fail.wait(12)==19
-                assert digest(exe)==old_exe_hash and sentinel.read_bytes()==b"portable-user-file"
-            finally:
-                kernel.CloseHandle(busy)
-            stop_window(restored)
-            subprocess.run([probe,"check",profile],env=test_env,check=True)
-            old=subprocess.Popen([exe,"--profile-dir",profile],cwd=temp,env=env)
-            original=await_window(exe,old.pid)
+            if inject_failures:
+                tampered=temp/"tampered.zip"
+                shutil.copy2(archive,tampered)
+                with tampered.open("ab") as f: f.write(b"tamper")
+                print("Checking tampered archive against a running 111 application",flush=True)
+                helper_process(driver,test_env,old,exe,tampered,data["sha256"],data["version"],data["build"],profile,"tamper")
+                assert digest(exe)==old_exe_hash and before==(digest(vault),digest(marker))
+                # Refuse to overwrite a busy existing package component after some
+                # preceding files have been replaced, then relaunch the old app.
+                busy=kernel.CreateFileW(str(app/"Qt6Widgets.dll"),0x80000000,1,None,3,0,None)
+                assert busy and busy!=wintypes.HANDLE(-1).value
+                try:
+                    print("Checking replacement rollback with a locked package DLL",flush=True)
+                    fail=helper_process(driver,test_env,old,exe,archive,data["sha256"],data["version"],data["build"],profile,"rollback")
+                    helpers.append(fail)
+                    stop_window(original)
+                    restored=await_window(exe,exclude=old.pid)
+                    notice=await_window(None,fail.pid);user.PostMessageW(notice[0],0x0010,0,0)
+                    assert fail.wait(12)==19
+                    assert digest(exe)==old_exe_hash and sentinel.read_bytes()==b"portable-user-file"
+                finally:
+                    kernel.CloseHandle(busy)
+                stop_window(restored)
+                subprocess.run([probe,"check",profile],env=test_env,check=True)
+                old=subprocess.Popen([exe,"--profile-dir",profile],cwd=temp,env=env)
+                original=await_window(exe,old.pid)
             print("Checking actual replacement and relaunch into the seeded profile",flush=True)
             good=helper_process(driver,test_env,old,exe,archive,data["sha256"],data["version"],data["build"],profile,"install")
             helpers.append(good)
@@ -242,7 +297,9 @@ def verify(work, archive, data):
                 try: stop_window(leftover)
                 except RuntimeError as issue: print(f"App cleanup: {issue}",flush=True)
             raise
-    return {"from":"0.18.0 (111) with test bootstrap","to":data["version"],"build":data["build"],
-            "tamper_refused":True,"locked_component_rollback":True,"updated_executable_relaunched":True,
+    result={"from":"0.18.0 (111) with test bootstrap","to":data["version"],"build":data["build"],
+            "updated_executable_relaunched":True,"old_and_updated_apps_exited_normally":True,
             "same_profile_argument":True,"same_vault_and_marker_sha256":True,"retained_unmanaged_file":True,
             "password_and_credentials_verified":["kiwoom","toss"]}
+    if inject_failures: result.update(tamper_refused=True,locked_component_rollback=True)
+    return result

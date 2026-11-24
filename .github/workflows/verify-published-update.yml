@@ -2,6 +2,10 @@ name: Verify published Windows update
 on:
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: Published candidate tag (defaults to the tag used to run the workflow)
+        type: string
+        required: false
       build_run:
         description: Successful Windows candidate run for this commit
         type: string
@@ -29,6 +33,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
           BUILD_RUN: ${{ inputs.build_run }}
           PREVIOUS_VERSION: ${{ inputs.previous_version }}
           PREVIOUS_BUILD: ${{ inputs.previous_build }}
@@ -38,8 +43,15 @@ jobs:
           if ($env:BUILD_RUN -notmatch '^[0-9]+$' -or $env:PREVIOUS_BUILD -notmatch '^[0-9]+$' -or
               $env:PREVIOUS_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid build reference' }
           $job = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:BUILD_RUN" | ConvertFrom-Json
-          if ($job.head_sha -ne $env:GITHUB_SHA -or $job.conclusion -ne 'success' -or
-              $job.path -ne '.github/workflows/windows-candidate.yml') { throw 'Candidate run does not match this commit' }
+          $tag = $env:RELEASE_TAG
+          if (-not $tag -and $env:GITHUB_REF_TYPE -eq 'tag') { $tag = $env:GITHUB_REF_NAME }
+          if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$' -or
+              ($env:GITHUB_REF_TYPE -eq 'tag' -and $tag -ne $env:GITHUB_REF_NAME)) { throw 'Invalid release tag' }
+          $release = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" | ConvertFrom-Json
+          $target = gh api "repos/$env:GITHUB_REPOSITORY/commits/$tag" --jq .sha
+          if ($release.draft -or $release.tag_name -ne $tag) { throw 'Release is not public' }
+          if ($job.head_sha -ne $target -or $job.conclusion -ne 'success' -or
+              $job.path -ne '.github/workflows/windows-candidate.yml') { throw 'Candidate run does not match the published tag' }
           $work = Join-Path $env:RUNNER_TEMP 'keefi-public-update'
           gh run download $env:BUILD_RUN --repo $env:GITHUB_REPOSITORY --name keefi-windows-x64 --dir "$work/dist"
           gh run download $env:BUILD_RUN --repo $env:GITHUB_REPOSITORY --name keefi-windows-update-probe --dir "$work/probe"

@@ -159,7 +159,7 @@ def build_package(args):
     ninja = shutil.which(args.ninja, path=env["PATH"])
     require(cmake and ninja, "CMake 3.27+ and Ninja must be available")
     config = [cmake, "-S", ROOT / "fincept-qt", "-B", build, "-G", "Ninja",
-              "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_MAKE_PROGRAM={ninja}",
+              "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_MAKE_PROGRAM={ninja}", f"-DPython3_EXECUTABLE={sys.executable}",
               f"-DCMAKE_PREFIX_PATH={qt}", f"-DKEEFI_SODIUM_ROOT={args.sodium_root.resolve()}",
               f"-DZLIB_ROOT={args.zlib_root.resolve()}", "-DZLIB_USE_STATIC_LIBS=ON",
               "-DKEEFI_G1_MODE=ON", "-DKEEFI_BUILD_TESTS=ON", "-DKEEFI_READ_ONLY_BETA=ON"]

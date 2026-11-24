@@ -8,7 +8,7 @@ Windows x64 테스트 배포본은 [GitHub Releases](https://github.com/gurosawa
 
 키움 REST 테스트는 국내주식 차트의 **증권 연결하기**에서 키움을 선택해 진행하세요. 앱에서 직접 두 키 파일을 불러오고 연결한 뒤, 보던 종목과 시간 간격으로 돌아오는지, 자산에 표시된 현금과 보유 수량이 증권사 화면과 일치하는지 확인할 수 있습니다. 금융 정보를 공개 이슈에 첨부하지 마세요.
 
-Windows x64 소스 빌드와 검증은 PowerShell에서 `./scripts/keefi/build-windows-candidate.ps1 -WorkDir "$env:TEMP/keefi-build"`로 실행합니다. SDK 다운로드, SHA-256 확인, Release 빌드와 테스트가 끝나면 지정한 폴더의 `dist`에 결과가 생성됩니다.
+Windows x64 소스 빌드와 검증은 PowerShell에서 `./scripts/keefi/build-windows-candidate.ps1 -WorkDir "$env:TEMP/keefi-build"`로 실행합니다. Windows Server 2022처럼 기본 `tar.exe`가 LZMA를 지원하지 않는 환경에서는 7-Zip이 필요합니다. SDK 다운로드, SHA-256 확인, Release 빌드와 테스트가 끝나면 지정한 폴더의 `dist`에 결과가 생성됩니다.
 
 ## 제공하는 기능
 

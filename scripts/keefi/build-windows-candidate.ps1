@@ -15,6 +15,12 @@ $work = [IO.Path]::GetFullPath($WorkDir)
 $sdk = Join-Path $work 'sdk'
 $downloads = Join-Path $work 'downloads'
 New-Item -ItemType Directory -Force -Path $sdk, $downloads | Out-Null
+$sevenZip = (Get-Command 7z.exe -CommandType Application -ErrorAction SilentlyContinue |
+             Select-Object -First 1).Source
+if (!$sevenZip) {
+    $installed = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+    if (Test-Path -LiteralPath $installed -PathType Leaf) { $sevenZip = $installed }
+}
 $lock = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'windows-sdk.lock.json') | ConvertFrom-Json
 foreach ($item in $lock) {
     $archive = Join-Path $downloads ([IO.Path]::GetFileName(([uri]$item.url).AbsolutePath))
@@ -28,7 +34,12 @@ foreach ($item in $lock) {
     }
     $out = Join-Path $sdk $item.extract_to
     New-Item -ItemType Directory -Force -Path $out | Out-Null
-    Invoke-Checked "$env:SystemRoot\System32\tar.exe" @('-xf', $archive, '-C', $out)
+    # Windows Server 2022's built-in tar lacks the LZMA codec for Qt's 7z files.
+    if ($sevenZip -and [IO.Path]::GetExtension($archive) -eq '.7z') {
+        Invoke-Checked $sevenZip @('x', '-y', '-bd', '-bso0', "-o$out", $archive)
+    } else {
+        Invoke-Checked "$env:SystemRoot\System32\tar.exe" @('-xf', $archive, '-C', $out)
+    }
     Write-Host "Verified $($item.component)"
 }
 

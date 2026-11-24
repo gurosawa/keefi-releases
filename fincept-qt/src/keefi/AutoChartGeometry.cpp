@@ -1,4 +1,5 @@
 #include "keefi/AutoChartGeometry.h"
+#include "keefi/ChartTimeAxis.h"
 #include <algorithm>
 #include <cmath>
 
@@ -269,7 +270,7 @@ AutoChartResult AutoChartGeometry::analyze(const ChartDrawingFrame& frame) {
 
                 TrendCandidate cand{
                     highSide,x1,x2,touches,pierces,
-                    {QStringLiteral("trend"),ChartDrawingKind::Trend,{anchorFor(allSide[a]),anchorFor(allSide[b])},touches,sweeps}
+                    {QStringLiteral("trend"),ChartDrawingKind::Trend,{anchorFor(allSide[a]),anchorFor(allSide[b])},touches,sweeps,highSide}
                 };
                 const auto better=[&](const TrendCandidate& lhs,const TrendCandidate& rhs){
                     if(lhs.touches!=rhs.touches)return lhs.touches>rhs.touches;
@@ -288,5 +289,46 @@ AutoChartResult AutoChartGeometry::analyze(const ChartDrawingFrame& frame) {
 
     if(result.candidates.isEmpty())result.reason=QStringLiteral("찾은 도형이 없어요");
     return result;
+}
+
+QList<QPointF> AutoChartGeometry::trendDisplayPath(const QList<ChartDrawingPoint>& anchors,
+                                                  const ChartDrawingFrame& frame, const ChartTimeAxis& axis) {
+    if (anchors.size() != 2 || !axis.available) return {};
+    const auto barIndex = [&](qint64 at) -> qsizetype {
+        const auto it = std::lower_bound(frame.bars.cbegin(), frame.bars.cend(), at,
+            [](const ChartDrawingBar& bar, qint64 time) { return bar.candle.startsAtMs < time; });
+        return it != frame.bars.cend() && it->candle.startsAtMs == at ? it - frame.bars.cbegin() : -1;
+    };
+    const auto first = barIndex(anchors[0].atMs);
+    const auto last = barIndex(anchors[1].atMs);
+    bool validFirst = false, validLast = false;
+    const double firstPrice = anchors[0].price.toDouble(&validFirst);
+    const double lastPrice = anchors[1].price.toDouble(&validLast);
+    if (first < 0 || last < 0 || !validFirst || !validLast || !std::isfinite(firstPrice) || !std::isfinite(lastPrice)) return {};
+    const auto firstSlot = axis.coordinateAt(anchors[0].atMs);
+    if (!firstSlot) return {};
+    QList<QPointF> path{{*firstSlot, firstPrice}};
+    if (first == last) {
+        path.append({*firstSlot, lastPrice});
+        return path;
+    }
+    const int direction = last > first ? 1 : -1;
+    double previousStride = 0;
+    QPointF previous = path.first();
+    for (auto i = first + direction; ; i += direction) {
+        const auto slot = axis.coordinateAt(frame.bars[i].candle.startsAtMs);
+        if (!slot) return {};
+        const double stride = *slot - previous.x();
+        // Consecutive bars with equal display spacing share a single straight segment.
+        if (i != first + direction && std::abs(stride - previousStride) > 1e-8)
+            path.append(previous);
+        if (i == last) {
+            path.append({*slot, lastPrice});
+            return path;
+        }
+        const double fraction = double(i - first) / double(last - first);
+        previous = {*slot, firstPrice + (lastPrice - firstPrice) * fraction};
+        previousStride = stride;
+    }
 }
 }

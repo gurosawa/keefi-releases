@@ -16,6 +16,7 @@
 #include "keefi/ChartPublicContextSource.h"
 #include "keefi/ChartIndicatorState.h"
 #include "keefi/ChartStudyHelp.h"
+#include "keefi/CoinTapeView.h"
 #include <QFutureWatcher>
 #include <QPromise>
 #include <QThreadPool>
@@ -64,6 +65,9 @@
 #include <QResizeEvent>
 #include <QSignalBlocker>
 #include <QShowEvent>
+#include <QSplitter>
+#include <QStackedWidget>
+#include <QTabBar>
 #include <QScrollArea>
 #include <QTimer>
 #include <QToolTip>
@@ -211,6 +215,24 @@ void flatPanel(QWidget* panel) {
     panel->setAttribute(Qt::WA_StyledBackground, true);
     setThemeStyle(panel, QString("QWidget#%1{background:${bg};border:1px solid ${rule};border-radius:12px;}").arg(panel->objectName()));
 }
+// The ▾ that opens the full interval list; a painted single-colour mark.
+class TimeframeListButton final : public QToolButton {
+public:
+    explicit TimeframeListButton(QWidget* parent) : QToolButton(parent) {
+        applyCompactButton(this, true);
+        bindThemePresentation(this, [this] { update(); });
+    }
+protected:
+    void paintEvent(QPaintEvent* event) override {
+        QToolButton::paintEvent(event);
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(isEnabled() ? themeColors().text : themeColors().text3);
+        const QPointF centre = QRectF(rect()).center();
+        painter.drawPolygon(QPolygonF{{centre.x() - 4.5, centre.y() - 2}, {centre.x() + 4.5, centre.y() - 2}, {centre.x(), centre.y() + 3}});
+    }
+};
 }
 ChartWorkspace::ChartWorkspace(MarketCandles* model, PortfolioController* portfolio, QWidget* parent)
     : QWidget(parent), portfolio_(portfolio), candleModel_(model) {
@@ -239,6 +261,7 @@ ChartWorkspace::ChartWorkspace(MarketCandles* model, PortfolioController* portfo
     outer->setContentsMargins(0,0,0,0);
     outer->setSpacing(16);
     auto* scroll = new QScrollArea(this);
+    scroll_ = scroll;
     scroll->setObjectName("chartWorkspaceScroll");
     scroll->setAccessibleName(tr("차트 작업 공간 스크롤"));
     scroll->setWidgetResizable(true);
@@ -686,12 +709,19 @@ ChartWorkspace::ChartWorkspace(MarketCandles* model, PortfolioController* portfo
         timeframeGroup->addButton(button, index); timeframeRow->addWidget(button);
         connect(button, &QPushButton::toggled, timeframeSelector_, [this, index](bool selected) { if (selected) timeframeSelector_->setCurrentIndex(index); });
     }
+    timeframeList_ = new TimeframeListButton(timeframeButtons);
+    timeframeList_->setObjectName("chartWorkspaceTimeframeList");
+    timeframeList_->setAccessibleName(tr("시간봉 목록"));
+    timeframeList_->setToolTip(tr("시간봉 목록 · ★ 툴바에 고정"));
+    timeframeList_->hide(); timeframeRow->addWidget(timeframeList_);
+    connect(timeframeList_, &QToolButton::clicked, this, [this] { openTimeframeList(timeframeList_); });
     const auto syncTimeframeButtons = [this, timeframeButtons] {
         for (auto* button : timeframeButtons->findChildren<QPushButton*>()) {
             const QSignalBlocker block(button);
             const auto index = timeframeSelector_->findData(button->objectName().section('_', 1).toLongLong());
             button->setChecked(index == timeframeSelector_->currentIndex()); button->setEnabled(timeframeSelector_->isEnabled());
         }
+        refreshTimeframeButtons();
     };
     connect(timeframeSelector_, &QComboBox::currentIndexChanged, timeframeButtons, syncTimeframeButtons);
     syncTimeframeButtons_ = syncTimeframeButtons; syncTimeframeButtons();
@@ -706,6 +736,15 @@ ChartWorkspace::ChartWorkspace(MarketCandles* model, PortfolioController* portfo
     connect(publicShare,&QAction::triggered,this,&ChartWorkspace::openShareCard);
     assetCardAction_=menu->addAction(tr("내 자산 카드 만들기"));assetCardAction_->setObjectName("chartAssetCardAction");assetCardAction_->setVisible(false);
     connect(assetCardAction_,&QAction::triggered,this,[this]{if(privateEnabled_&&!selectedHoldingAsset_.isEmpty())emit assetCardRequested(selectedHoldingAsset_);});
+    // Pins are edited in the interval list itself; with every interval pinned
+    // the toolbar has no list button, so the same list opens from here.
+    timeframeFavorites_=menu->addAction(tr("시간봉 즐겨찾기"));timeframeFavorites_->setObjectName("chartTimeframeFavorites");
+    connect(timeframeFavorites_,&QAction::triggered,this,[this]{QTimer::singleShot(0,this,[this]{
+        QWidget* anchor=timeframeList_->isVisible()?static_cast<QWidget*>(timeframeList_):timeframeButtons_->isVisible()?timeframeButtons_:timeframeSelector_->isVisible()?static_cast<QWidget*>(timeframeSelector_):moreTools_;
+        openTimeframeList(anchor);});});
+    sidePanelAction_=menu->addAction(tr("체결 · 근거"));sidePanelAction_->setObjectName("chartSidePanelAction");
+    sidePanelAction_->setCheckable(true);sidePanelAction_->setChecked(true);
+    connect(sidePanelAction_,&QAction::toggled,this,[this](bool open){if(sideOpen_==open)return;if(!open&&sidePlaced_&&sidePanel_&&sidePanel_->isVisible())sideShare_.remember(*sideSplitter_);sideOpen_=open;layoutSidePanel();});
     more->setMenu(menu);more->setCompact();moreTools_=more;
     holdingContext_=new QLabel(chartPane_);holdingContext_->setObjectName("chartHoldingContext");holdingContext_->setTextFormat(Qt::PlainText);holdingContext_->setWordWrap(true);holdingContext_->setFont(KeefiFonts::font(FontRole::Caption12));holdingContext_->hide();chartLayout->addWidget(holdingContext_);
     gridSelector_=new LocalComboBox(chartPane_);gridSelector_->setObjectName("chartLayoutSelector");gridSelector_->setAccessibleName(tr("차트 분할 보기"));gridSelector_->setMinimumHeight(44);
@@ -792,6 +831,7 @@ ChartWorkspace::ChartWorkspace(MarketCandles* model, PortfolioController* portfo
         syncButton->setToolTip(multi ? QString{} : tr("2분할에서 쓸 수 있어요"));
         if(multi)grid_->observeActiveViewport(candles_->syncViewport(),candles_->followsLive(),candles_->nominalZoomBars());
         refreshWatchlistRows();
+        layoutSidePanel();
     });
     candles_ = new MarketCandlesView(model, chartPane_);
     connect(candles_,&MarketCandlesView::viewportChanged,this,[this]{
@@ -852,7 +892,7 @@ ChartWorkspace::ChartWorkspace(MarketCandles* model, PortfolioController* portfo
     QWidget* previous=info;
     QList<QWidget*> focusOrder;
     for(auto* button:timeframeButtons_->findChildren<QPushButton*>())focusOrder<<button;
-    focusOrder<<timeframeSelector_<<extendedSessions_<<findChild<QWidget*>("chartStudyPicker")<<findChild<QWidget*>("chartStudyAppliedToggle")<<styleTools_;
+    focusOrder<<timeframeList_<<timeframeSelector_<<extendedSessions_<<findChild<QWidget*>("chartStudyPicker")<<findChild<QWidget*>("chartStudyAppliedToggle")<<styleTools_;
     for(auto* button:layoutButtons_->findChildren<QPushButton*>())focusOrder<<button;
     focusOrder<<syncTools_<<moreTools_;
     for(auto* widget:focusOrder){QWidget::setTabOrder(previous,widget);previous=widget;}
@@ -886,7 +926,7 @@ ChartWorkspace::ChartWorkspace(MarketCandles* model, PortfolioController* portfo
     setThemeStyle(liquidationRibbon_,"background:${bg};color:${danger};border:1px solid ${danger};padding:8px;");
     liquidationRibbon_->hide();chartLayout->addWidget(liquidationRibbon_);
     detailsToggle_=new QPushButton(tr("포지션 · 지금 상태 펼치기"),chartPane_);detailsToggle_->setObjectName("chartDetailsToggle");applyCompactButton(detailsToggle_);detailsToggle_->setCheckable(true);chartLayout->addWidget(detailsToggle_);
-    connect(detailsToggle_,&QPushButton::toggled,this,[this](bool expanded){if(positions_)positions_->setVisible(expanded);detailsToggle_->setText(expanded?tr("포지션 · 지금 상태 접기"):tr("포지션 · 지금 상태 펼치기"));});
+    connect(detailsToggle_,&QPushButton::toggled,this,[this](bool expanded){if(positions_)positions_->setVisible(expanded);updateDetailsToggleText();});
 
     auto* ledgerTitle = new QLabel(tr("시장 원장"), chartPane_); ledgerTitle->setObjectName("chartMarketLedgerTitle");
     ledgerTitle->setFont(KeefiFonts::font(FontRole::Title17)); ledgerTitle->hide();
@@ -943,14 +983,13 @@ ChartWorkspace::ChartWorkspace(MarketCandles* model, PortfolioController* portfo
     scoreEmpty_=new LedgerTextLabel(FontRole::Caption12,scoreBody_);scoreEmpty_->setObjectName("chartStudyScorecardEmpty");scoreEmpty_->setFont(KeefiFonts::font(FontRole::Caption12));scoreEmpty_->setWordWrap(true);scoreBodyLayout->addWidget(scoreEmpty_);
     scorecardText_=new LedgerTextLabel(FontRole::Caption12,scoreBody_);scorecardText_->setObjectName("chartStudyScorecard");scorecardText_->setTextFormat(Qt::PlainText);scorecardText_->setWordWrap(true);scoreBodyLayout->addWidget(scorecardText_);
     auto* similarTitle=new QLabel(chartStudyName("similarity"),scoreBody_);similarTitle->setObjectName("chartStudySimilarityTitle");similarTitle->setWordWrap(true);auto* similarHeading=new QHBoxLayout;similarHeading->addWidget(similarTitle,1);auto* similarInformation=new InfoButton(scoreBody_);similarInformation->setObjectName("chartStudySimilarityInfo");similarInformation->setFixedSize(44,44);similarHeading->addWidget(similarInformation);scoreBodyLayout->addLayout(similarHeading);
-    similaritySummary_=new LedgerTextLabel(FontRole::Caption12,scoreBody_);similaritySummary_->setObjectName("chartStudySimilaritySummary");similaritySummary_->setWordWrap(true);scoreBodyLayout->addWidget(similaritySummary_);scoreBodyLayout->addStretch();scoreBody_->hide();scoreLayout->addWidget(scoreBody_,1);positionLayout->addWidget(scoreCard_,1);
+    similaritySummary_=new LedgerTextLabel(FontRole::Caption12,scoreBody_);similaritySummary_->setObjectName("chartStudySimilaritySummary");similaritySummary_->setWordWrap(true);scoreBodyLayout->addWidget(similaritySummary_);scoreBodyLayout->addStretch();scoreBody_->hide();scoreLayout->addWidget(scoreBody_,1);
     connect(scoreSelector,&QComboBox::currentIndexChanged,this,[this,scoreSelector]{candles_->setScorecardStudy(scoreMode_?scoreSelector->currentData().toString():QString{});refreshStudyPanels();});
     connect(scoreToggle_,&QPushButton::clicked,this,[this,stateTitle,scoreSelector]{scoreMode_=!scoreMode_;statusBody_->setVisible(!scoreMode_);scoreBody_->setVisible(scoreMode_);stateTitle->setText(scoreMode_?tr("성적표"):tr("지금 상태"));scoreToggle_->setText(scoreMode_?tr("지금 상태"):tr("성적표"));candles_->setScorecardStudy(scoreMode_?scoreSelector->currentData().toString():QString{});refreshStudyPanels();});
     connect(indicatorPreferences_, &ChartStudyPreferences::changed, this, &ChartWorkspace::refreshStudyPanels);
     refreshStudyPanels(); refreshPositionPresentation();
     candles_->setAsset(asset_);
-    panels->addWidget(chartPane_, 1);
-    panels->addWidget(positions_);
+    buildSidePanel(panels);
     setWatchlistModel(new WatchlistWorkspaceList(this));
     if (model) connect(model, &MarketCandles::changed, this, [this] {
         if (chartSupported_ && selectedChartIdentity_.startsWith("coin:binance:")) {
@@ -976,6 +1015,67 @@ ChartWorkspace::ChartWorkspace(MarketCandles* model, PortfolioController* portfo
         if (isVisible()) refreshPositions();
     });
     timer->start();
+}
+void ChartWorkspace::buildSidePanel(QBoxLayout* panels) {
+    sideSplitter_ = new QSplitter(Qt::Horizontal, panels->parentWidget());
+    sideSplitter_->setObjectName("chartWorkspaceSplitter");
+    sideSplitter_->setChildrenCollapsible(false);
+    sideSplitter_->setHandleWidth(12);
+    setThemeStyle(sideSplitter_, "QSplitter#chartWorkspaceSplitter::handle{background:transparent;}");
+    chartColumn_ = new QWidget(sideSplitter_);
+    chartColumn_->setObjectName("chartWorkspaceMain");
+    auto* column = new QVBoxLayout(chartColumn_);
+    column->setContentsMargins(0, 0, 0, 0); column->setSpacing(12);
+    column->addWidget(chartPane_, 1);
+    column->addWidget(positions_);
+    sidePanel_ = new QWidget(sideSplitter_);
+    sidePanel_->setObjectName("chartSidePanel");
+    auto* side = new QVBoxLayout(sidePanel_);
+    side->setContentsMargins(0, 0, 0, 0); side->setSpacing(8);
+    sideTabs_ = new QTabBar(sidePanel_);
+    sideTabs_->setObjectName("chartSidePanelTabs");
+    sideTabs_->setAccessibleName(tr("체결·청산과 근거"));
+    applySegmentedControlStyle(sideTabs_, CompactButtonHeight);
+    // Two halves of the panel width: a tab is never elided or scrolled away.
+    sideTabs_->setExpanding(true);
+    sideTabs_->setUsesScrollButtons(false);
+    sideTabs_->setElideMode(Qt::ElideNone);
+    // Reached with Tab; a mouse click chooses a tab without a focus ring on it.
+    sideTabs_->setFocusPolicy(Qt::TabFocus);
+    sideTabs_->addTab(tr("체결·청산"));
+    sideTabs_->addTab(tr("근거"));
+    sideStack_ = new QStackedWidget(sidePanel_);
+    sideStack_->setObjectName("chartSidePanelStack");
+    auto* tapeCard = new QWidget(sideStack_);
+    tapeCard->setObjectName("chartTapePanel");
+    flatPanel(tapeCard);
+    auto* tapeLayout = new QVBoxLayout(tapeCard);
+    tapeLayout->setContentsMargins(2, 6, 2, 6);
+    tape_ = new CoinTapeView(tapeCard);
+    tape_->setIdentity(selectedChartIdentity_);
+    tapeLayout->addWidget(tape_, 1);
+    sideStack_->addWidget(tapeCard);
+    // The evidence tab is the existing current-state/scorecard card, moved whole.
+    sideStack_->addWidget(scoreCard_);
+    // Evidence first: it is what this card showed before, and a public trade
+    // stream starts only once the tape tab is chosen.
+    sideTabs_->setCurrentIndex(1);
+    sideStack_->setCurrentIndex(1);
+    connect(sideTabs_, &QTabBar::currentChanged, sideStack_, &QStackedWidget::setCurrentIndex);
+    side->addWidget(sideTabs_);
+    side->addWidget(sideStack_, 1);
+    sideSplitter_->addWidget(chartColumn_);
+    sideSplitter_->addWidget(sidePanel_);
+    sideSplitter_->setStretchFactor(0, 1);
+    sideSplitter_->setStretchFactor(1, 0);
+    sidePlaced_ = true;
+    panels->addWidget(sideSplitter_, 1);
+    connect(sideSplitter_, &QSplitter::splitterMoved, this, [this] {
+        sideUserSized_ = true;
+        sideShare_.remember(*sideSplitter_);
+    });
+    connect(tape_, &CoinTapeView::shownChanged, this, &ChartWorkspace::updateCoinTapeVisibility);
+    sideSplitter_->installEventFilter(this);
 }
 ChartDrawings* ChartWorkspace::drawingModel() const { return drawings_; }
 void ChartWorkspace::setDrawingAlertEnabledLists(const QSet<QString>& enabled) {
@@ -1039,7 +1139,7 @@ void ChartWorkspace::setIncludeExtendedSessions(bool include) {
     candles_->setIncludeExtendedSessions(include);
     emit sessionPolicyChanged(include);
 }
-void ChartWorkspace::setCoinFlowSource(CoinFlowSource* source){if(candles_)candles_->setCoinFlowSource(source);}
+void ChartWorkspace::setCoinFlowSource(CoinFlowSource* source){if(candles_)candles_->setCoinFlowSource(source);if(tape_)tape_->setSource(source);}
 void ChartWorkspace::setPublicNameSources(PublicMarketCatalog* markets,PublicEquityBoard* board,ChartInstrumentCatalog* instruments){
     if(publicMarkets_)disconnect(publicMarkets_,&PublicMarketCatalog::changed,this,&ChartWorkspace::refreshRoutingSources);
     if(publicBoard_)disconnect(publicBoard_,&PublicEquityBoard::changed,this,&ChartWorkspace::refreshRoutingSources);
@@ -1196,6 +1296,7 @@ bool ChartWorkspace::setIdentity(const QString& requestedKey, bool publicDrawing
     return true;
 }
 void ChartWorkspace::synchronizeChartSelection() {
+    if (tape_) tape_->setIdentity(selectedChartIdentity_);
     for (auto* tree : {holdingsRows_, watchlistRows_, trendRows_}) {
         if (!tree) continue;
         QTreeWidgetItem* match = nullptr;
@@ -1209,12 +1310,14 @@ void ChartWorkspace::synchronizeChartSelection() {
 }
 void ChartWorkspace::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
+    layoutSidePanel();
     if (instrumentPanel_ && instrumentPanel_->isVisible()) positionInstrumentPanel();
     scheduleVisibleRows();
 }
 void ChartWorkspace::showEvent(QShowEvent* event) {
     QTimer::singleShot(0,this,[this]{refreshTrendDemands();refreshSelectedStudies();});
     QWidget::showEvent(event);
+    layoutSidePanel();
     refreshWatchlists();
     ensureBrowserCatalog();
     contractPending_ = true;

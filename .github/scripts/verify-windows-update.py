@@ -108,14 +108,21 @@ class DetachedUpdater:
 
 
 def helper_process(driver, env, old, exe, archive, sha, version, build, profile, mode):
-    attempt = subprocess.run([driver,str(old.pid),exe,archive,sha,version,str(build),profile],env=env,
-                             capture_output=True,timeout=25)
-    if mode=="tamper":
-        assert attempt.returncode==1 and old.poll() is None
-        return None
-    if attempt.returncode!=0:
-        raise RuntimeError(f"Production handoff failed during {mode}: {attempt.stderr!r}")
-    return DetachedUpdater(int(attempt.stdout.strip()))
+    # The detached installer can keep inherited output handles open while it
+    # waits for the old app. Wait for the driver itself, then read its PID.
+    with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
+        attempt = subprocess.run(
+            [driver, str(old.pid), exe, archive, sha, version, str(build), profile],
+            env=env, stdin=subprocess.DEVNULL, stdout=output, stderr=errors, timeout=25,
+        )
+        if mode == "tamper":
+            assert attempt.returncode == 1 and old.poll() is None
+            return None
+        if attempt.returncode != 0:
+            errors.seek(0)
+            raise RuntimeError(f"Production handoff failed during {mode}: {errors.read()!r}")
+        output.seek(0)
+        return DetachedUpdater(int(output.readline().strip()))
 
 
 def verify(work, archive, data):

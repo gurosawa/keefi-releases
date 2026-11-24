@@ -871,4 +871,10 @@ CoinFlowStudySet coinFlowStudies(const CoinFlowSnapshot& input,qint64 asOfMs) {
 CoinFlowStudySet coinFlowStudiesWithReversalEvidence(const CoinFlowSnapshot& input,qint64 asOfMs) {
     return calculateFlowStudies(input,asOfMs,true);
 }
+QList<CoinLargeTradePoint> coinLargeTrades(const CoinFlowWindow& input,qint64 asOfMs,qint64 candidateFromMs) {
+    if(asOfMs<=0) return {};
+    const Window window=prepare(input,asOfMs);
+    if(!window.valid) return {};
+    return largeStudy(window,asOfMs,asOfMs,candidateFromMs).candidates;
+}
 } // namespace keefi

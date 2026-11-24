@@ -571,6 +571,8 @@ MarketCandlesView::MarketCandlesView(MarketCandles* model,QWidget* p):QWidget(p)
     futuresLedger_=new QWidget(chartColumn);futuresLedger_->setObjectName("chartFuturesLedger");auto* futureLayout=new QHBoxLayout(futuresLedger_);futureLayout->setContentsMargins(0,0,0,0);futuresLedgerText_=new QLabel(futuresLedger_);futuresLedgerText_->setMinimumWidth(0);futuresLedgerText_->setTextFormat(Qt::RichText);futuresLedgerText_->setWordWrap(false);futureLayout->addWidget(futuresLedgerText_,1);auto* futureInfo=new InfoButton(futuresLedger_);futureInfo->setObjectName("chartFuturesInformation");futureInfo->setFixedSize(44,44);futureLayout->addWidget(futureInfo);liquidationRecords_=new QPushButton(tr("청산 관측"),futuresLedger_);liquidationRecords_->setObjectName("chartLiquidationRecordsButton");liquidationRecords_->setMinimumSize(44,44);futureLayout->addWidget(liquidationRecords_);connect(liquidationRecords_,&QPushButton::clicked,this,&MarketCandlesView::showLiquidationRecords);chartColumnLayout->addWidget(futuresLedger_);futuresLedger_->hide();plotLayout->addWidget(chartColumn,1);
     layout->addWidget(plotBody,1);
     drawingStatus_=label("chartDrawingStatus",FontRole::Caption12);drawingStatus_->setProperty("type","caption");
+    drawingFeedbackTimer_=new QTimer(this);drawingFeedbackTimer_->setSingleShot(true);drawingFeedbackTimer_->setInterval(4000);
+    connect(drawingFeedbackTimer_,&QTimer::timeout,this,&MarketCandlesView::clearDrawingFeedback);
     pullbackEvidence_=new StudyLegendLabel(this);pullbackEvidence_->setObjectName("chartStudyPullbackEvidence");pullbackEvidence_->setWordWrap(true);pullbackEvidence_->setTextFormat(Qt::PlainText);pullbackEvidence_->setProperty("accent",true);layout->addWidget(pullbackEvidence_);pullbackEvidence_->hide();
     static_cast<CandleChart*>(chart_)->drawingUiChanged=[this]{refreshDrawingUi();};
     static_cast<CandleChart*>(chart_)->drawingFeedback=[this](const QString& text){drawingStatus_->setText(text);};
@@ -1491,7 +1493,7 @@ void MarketCandlesView::setSelection(const QString& identity,qint64 interval){
     if(!supportedTimeframe(interval))return;
     if(identity!=identity_||interval!=intervalMs_){static_cast<CandleChart*>(chart_)->setLiveTradePrice({},0);static_cast<CandleChart*>(chart_)->resetViewport();}
     if((identity_!=identity||intervalMs_!=interval)&&indicatorHelpDialog_)indicatorHelpDialog_->reject();
-    if(identity_!=identity||intervalMs_!=interval){++flowGeneration_;higherTrends_.clear();minuteZonesSnapshot_={};relativeSnapshot_={};supplementalKey_.clear();if(coinFlowRunner_)coinFlowRunner_->invalidate();coinFlowKey_.clear();static_cast<CandleChart*>(chart_)->cancelDrawingGesture();setCandleEvidenceNumber(0);clearPrivate();invalidateCompletedStudies();}
+    if(identity_!=identity||intervalMs_!=interval){++flowGeneration_;higherTrends_.clear();minuteZonesSnapshot_={};relativeSnapshot_={};supplementalKey_.clear();if(coinFlowRunner_)coinFlowRunner_->invalidate();coinFlowKey_.clear();static_cast<CandleChart*>(chart_)->cancelDrawingGesture();clearDrawingFeedback();setCandleEvidenceNumber(0);clearPrivate();invalidateCompletedStudies();}
     if(identity!=metadataFailureIdentity_){metadataFailureIdentity_.clear();metadataFailureReason_.clear();}
     identity_=identity;intervalMs_=interval;asset_.clear();currency_.clear();
     const auto upbit=QRegularExpression("\\Acoin:upbit:(KRW|BTC|USDT)-([A-Z0-9]{1,20})\\z").match(identity_);
@@ -1514,6 +1516,7 @@ void MarketCandlesView::hideEvent(QHideEvent* e){
     if(publicContextSource_)publicContextSource_->setDemand(false,false);
     static_cast<CandleChart*>(chart_)->setLiveTradePrice({},0);
     static_cast<CandleChart*>(chart_)->cancelDrawingGesture();
+    clearDrawingFeedback();
     if(!identity_.startsWith("stock:"))invalidateCompletedStudies();
     QWidget::hideEvent(e);
     if(stockSource_)stockSource_->setActive(false);
@@ -1666,7 +1669,7 @@ void MarketCandlesView::refreshInformation(){
         {basis.isEmpty()?unavailable:basis+QStringLiteral(" · ")+timeframeLabel(intervalMs_),
          provider.isEmpty()?unavailable:provider,delay,currency_.isEmpty()?unavailable:currency_,summary},
         usabilityPublicText(information.join("\n\n")));
-    study_->hide();findChild<QLabel*>("marketCandlesStudyState")->hide();drawingStatus_->hide();stockContext_->hide();
+    study_->hide();findChild<QLabel*>("marketCandlesStudyState")->hide();if(drawingFeedbackText_.isEmpty())drawingStatus_->hide();stockContext_->hide();
     const bool vi=stock&&stockSnapshot_.restrictions.currentVI.value_or(false);stockObservations_->setVisible(vi);if(vi)stockObservations_->setText(usabilityText(UsabilityText::StockVi));
     // Source failures remain explicit; normal source timing leaves the main view.
     const bool canConnect=stock&&matches&&!data.available&&stockSnapshot_.connectionIssue.has_value();

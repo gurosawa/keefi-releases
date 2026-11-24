@@ -276,6 +276,7 @@ void LocalWindow::setMarketCandles(MarketCandles* candles) {
             refreshChartWatchlists();
     };
     connect(chartWorkspace_, &ChartWorkspace::coinFlowStudiesChanged, this, refreshVisibleStudyRows);
+    connect(chartWorkspace_, &ChartWorkspace::coinTapeVisibilityChanged, this, &LocalWindow::syncCoinFlowDemand);
     if(!chartInstrumentTransport_)chartInstrumentTransport_=new NetworkTradingTransport(this);
     chartInstruments_=new ChartInstrumentCatalog(chartInstrumentTransport_,this);
     chartWorkspace_->setPublicNameSources(markets_,board_,chartInstruments_);
@@ -435,10 +436,13 @@ void LocalWindow::syncCoinFlowDemand(){
     if(!chartCoinFlow_||chartCoinFlowSyncing_||chartCoinFlowStopping_)return;
     const QScopedValueRollback syncing(chartCoinFlowSyncing_,true);
     QString wanted;bool selected=false;
-    if(chartWorkspace_&&chartWorkspace_->isVisible()&&isVisible()&&!isMinimized()&&
-       chartWorkspace_->indicatorPreferences()&&(chartWorkspace_->indicatorPreferences()->enabled("whales")||chartWorkspace_->indicatorPreferences()->enabled("cvd")||chartWorkspace_->indicatorPreferences()->enabled("strong")||chartWorkspace_->indicatorPreferences()->enabled("low_volume")||(chartAlerts_&&chartAlerts_->observationEnabled("strong_reversal")))){
+    const bool chartShown=chartWorkspace_&&chartWorkspace_->isVisible()&&isVisible()&&!isMinimized();
+    const bool studies=chartShown&&chartWorkspace_->indicatorPreferences()&&(chartWorkspace_->indicatorPreferences()->enabled("whales")||chartWorkspace_->indicatorPreferences()->enabled("cvd")||chartWorkspace_->indicatorPreferences()->enabled("strong")||chartWorkspace_->indicatorPreferences()->enabled("low_volume")||(chartAlerts_&&chartAlerts_->observationEnabled("strong_reversal")));
+    // The trade tape needs the trades alone: no completed-minute candle reads.
+    const bool tape=chartShown&&chartWorkspace_->coinTapeVisible();
+    if(studies||tape){
         const auto identity=WatchlistWorkspaceList::identityFromKey(chartWorkspace_->selectedChartIdentity());
-        if(identity.market=="coin"&&(identity.source=="upbit"||identity.source=="binance")){wanted=identity.key();selected=true;}
+        if(identity.market=="coin"&&(identity.source=="upbit"||identity.source=="binance")){wanted=identity.key();selected=studies;}
     }
     if(wanted.isEmpty()&&chartAlerts_&&chartAlertFeed_&&chartAlertFeed_->running()){
         QStringList demands;const bool readable=portfolio_&&!chartPrivateBlocked_&&!chartSourceResetting_&&securityReady_&&accountReadsAvailable(vault_);

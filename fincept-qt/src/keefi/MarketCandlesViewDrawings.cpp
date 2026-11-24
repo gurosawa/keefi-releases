@@ -21,6 +21,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFrame>
+#include <QKeySequence>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPainter>
@@ -32,6 +33,7 @@
 #include <QGridLayout>
 #include <QScrollArea>
 #include <QSignalBlocker>
+#include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QSet>
@@ -230,19 +232,32 @@ void MarketCandlesView::setCandleEvidenceNumber(int number){static_cast<CandleCh
 void MarketCandlesView::clearPrivate(){setPriceLines({});}
 void MarketCandlesView::setDrawingModel(ChartDrawings* model){
     if(drawingModel_==model)return;if(drawingModel_)disconnect(drawingModel_,nullptr,this,nullptr);
-    static_cast<CandleChart*>(chart_)->cancelDrawingGesture();drawingModel_=model;
+    static_cast<CandleChart*>(chart_)->cancelDrawingGesture();clearDrawingFeedback();drawingModel_=model;
     if(model){connect(model,&ChartDrawings::changed,this,&MarketCandlesView::refreshDrawingUi);
-        connect(model,&QObject::destroyed,this,[this]{drawingModel_=nullptr;static_cast<CandleChart*>(chart_)->setDrawingFrame(nullptr,{});refreshDrawingUi();});}
+        connect(model,&QObject::destroyed,this,[this]{drawingModel_=nullptr;clearDrawingFeedback();static_cast<CandleChart*>(chart_)->setDrawingFrame(nullptr,{});refreshDrawingUi();});}
     syncDrawingContext(drawingSeries_);
 }
 void MarketCandlesView::setDrawingPublicContext(bool publicAllowed){
     const bool changed=drawingPublicContext_!=publicAllowed||drawingPrivateCleared_;drawingPublicContext_=publicAllowed;drawingPrivateCleared_=false;
-    if(changed){static_cast<CandleChart*>(chart_)->cancelDrawingGesture();syncDrawingContext(drawingSeries_);}
+    if(changed){static_cast<CandleChart*>(chart_)->cancelDrawingGesture();clearDrawingFeedback();syncDrawingContext(drawingSeries_);}
 }
 void MarketCandlesView::clearPrivateDrawingContext(){
     if(indicatorHelpDialog_)indicatorHelpDialog_->reject();
-    static_cast<CandleChart*>(chart_)->cancelDrawingGesture();if(!drawingPublicContext_)drawingPrivateCleared_=true;
+    static_cast<CandleChart*>(chart_)->cancelDrawingGesture();clearDrawingFeedback();if(!drawingPublicContext_)drawingPrivateCleared_=true;
     refreshDrawingUi();
+}
+void MarketCandlesView::showDrawingFeedback(const QString& text){
+    if(text.isEmpty()){clearDrawingFeedback();return;}
+    drawingFeedbackText_=text;
+    drawingFeedbackGen_=drawingModel_?drawingModel_->contextGeneration():0;
+    if(drawingStatus_){drawingStatus_->setText(text);drawingStatus_->show();}
+    if(drawingFeedbackTimer_)drawingFeedbackTimer_->start();
+}
+void MarketCandlesView::clearDrawingFeedback(){
+    drawingFeedbackText_.clear();
+    drawingFeedbackGen_=0;
+    if(drawingFeedbackTimer_)drawingFeedbackTimer_->stop();
+    if(drawingStatus_)drawingStatus_->hide();
 }
 void MarketCandlesView::setDrawingAlertLists(const QMap<QString,QString>& names,const QSet<QString>& enabled){
     if(drawingAlertListNames_==names&&drawingEnabledLineLists_==enabled)return;drawingAlertListNames_=names;drawingEnabledLineLists_=enabled;refreshDrawingUi();
@@ -301,8 +316,15 @@ void MarketCandlesView::refreshDrawingUi(){
     QString state=!closed?tr("실제 완료 봉과 공개 통화를 확인하면 그림을 그릴 수 있어요."):
         tr("%1 · %2개 그림 · 가격·UTC 시각 저장 · 두 점 도구는 클릭 두 번, Esc로 취소").arg(ChartDrawings::bucketForInterval(intervalMs_)=="daily"?tr("일봉 그림"):tr("분·시간봉 그림")).arg(drawingModel_->drawings().size());
     if(context&&!drawingModel_->context().publicPersistenceAllowed)state+=tr(" · 보유에서 연 임시 그림: 프로필 저장·알림 사용 안 함");
-    if(locked)state+=tr(" · 편집 잠금");if(drawingModel_&&!drawingModel_->visible())state+=tr(" · 그림 숨김 · 켠 알림은 계속됨");drawingStatus_->setText(state);drawingStatus_->hide();
+    if(!drawingFeedbackText_.isEmpty()&&drawingModel_&&drawingModel_->contextGeneration()!=drawingFeedbackGen_)clearDrawingFeedback();
+    if(locked)state+=tr(" · 편집 잠금");if(drawingModel_&&!drawingModel_->visible())state+=tr(" · 그림 숨김 · 켠 알림은 계속됨");
+    if(!drawingFeedbackText_.isEmpty()){drawingStatus_->setText(drawingFeedbackText_);drawingStatus_->show();}
+    else{drawingStatus_->setText(state);drawingStatus_->hide();}
     for(auto* button:drawingToolbar_->findChildren<QToolButton*>())button->setToolTip(button->accessibleName()+"\n"+state);
+    if(drawingMagnet_){
+        const auto mod=QKeySequence(Qt::CTRL).toString(QKeySequence::NativeText);
+        drawingMagnet_->setToolTip(tr("자석 · %1 누른 채 24px 강한 자석\n실제 완료 봉의 시가·고가·저가·종가에 붙입니다.").arg(mod));
+    }
     if(drawingAuto_){
         const QString reason=!context||!closed?tr("완료 봉이 준비되면 자동 작도를 쓸 수 있어요."):
             locked?tr("그리기 편집이 잠겨 있어 자동 작도를 켤 수 없어요."):
@@ -336,16 +358,17 @@ void MarketCandlesView::saveDrawingAlert(){
     ChartDrawingAlert alert{drawingLineEnabled_->isChecked(),drawingLineOwner_->currentData().toString(),drawingLineInterval_->currentData().toLongLong()};
     if(!alert.enabled){bool wasEnabled=false;for(const auto& shape:drawingModel_->drawings())if(shape.id==static_cast<CandleChart*>(chart_)->selectedDrawing())wasEnabled=shape.alert.enabled;
         if(!wasEnabled){refreshDrawingUi();return;}alert={};}
-    QString error;if(!drawingModel_->setAlert(static_cast<CandleChart*>(chart_)->selectedDrawing(),alert,&error))drawingStatus_->setText(error);refreshDrawingUi();
+    QString error;if(!drawingModel_->setAlert(static_cast<CandleChart*>(chart_)->selectedDrawing(),alert,&error))showDrawingFeedback(error);refreshDrawingUi();
 }
 void MarketCandlesView::runAutoChartGeometry(){
     if(!drawingModel_||!drawingContextEditable()||!drawingModel_->visible()||drawingModel_->locked())return;
     const auto frame=drawingFrame();
     const auto result=AutoChartGeometry::analyze(frame);
     if(!result.available||result.candidates.isEmpty()){
-        drawingStatus_->setText(result.reason.isEmpty()?tr("작도할 후보가 없습니다."):result.reason);
+        showDrawingFeedback(result.reason.isEmpty()?tr("작도할 후보가 없습니다."):result.reason);
         return;
     }
+    clearDrawingFeedback();
     clearAutoPreviewPanel();
     QList<DrawingPreviewItem> items;
     for(const auto& candidate:result.candidates){
@@ -387,9 +410,10 @@ void MarketCandlesView::applyAutoPreview(){
     }
     QString error;
     if(!drawingModel_->applyBatch(shapes,frame,&error)){
-        drawingStatus_->setText(error);
+        showDrawingFeedback(error.isEmpty()?tr("자동 작도를 적용할 수 없어요."):error);
         return;
     }
+    clearDrawingFeedback();
     static_cast<CandleChart*>(chart_)->clearAutoPreview();
     clearAutoPreviewPanel();
     syncDrawingObjectsPanel();

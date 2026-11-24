@@ -1,4 +1,5 @@
 #include "keefi/ChartWorkspace.h"
+#include <QSplitter>
 #include "keefi/ChartWorkspacePresentation_p.h"
 #include "keefi/HoldingChartPanel.h"
 #include "keefi/ChartMarketResolver.h"
@@ -348,6 +349,7 @@ bool ChartWorkspace::eventFilter(QObject* object, QEvent* event) {
     if((object==toolbar_||object==instrumentTools_||object==frequentTools_||object==secondaryTools_)&&
        (event->type()==QEvent::Resize||event->type()==QEvent::LayoutRequest))layoutToolbar();
     if(object==instrumentButton_&&event->type()==QEvent::LayoutRequest)layoutToolbar();
+    if(object==sideSplitter_&&event->type()==QEvent::Resize)layoutSidePanel();
     if(object==relatedMarkets_&&event->type()==QEvent::Resize){renderMarketContext();return false;}
     if (object == instrumentTitle_ && event->type() == QEvent::ToolTipChange)
         instrumentButton_->setToolTip(instrumentTitle_->toolTip());

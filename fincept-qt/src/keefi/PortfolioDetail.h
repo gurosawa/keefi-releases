@@ -1,6 +1,7 @@
 #pragma once
 
 #include "keefi/PortfolioPresentation.h"
+#include "keefi/SplitterShare.h"
 #include "keefi/PortfolioMoneyDisplay.h"
 #include "keefi/PublicMarketCatalog.h"
 #include "keefi/ExploreMetricCard.h"
@@ -135,7 +136,7 @@ class ListDetailView final : public QWidget {
     QPointer<QWidget> list_;
     QPointer<AssetDetailPanel> detail_;
     bool narrow_ = false, detailShown_ = false, sized_ = false, detailOnlyWithSelection_ = false;
-    double detailShare_ = 0.4; // the first wide layout's 60:40
+    SplitterShare detailShare_{0.4}; // the first wide layout's 60:40
 };
 
 } // namespace keefi

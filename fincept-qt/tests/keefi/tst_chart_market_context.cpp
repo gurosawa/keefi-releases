@@ -15,6 +15,7 @@
 #include "keefi/WatchlistWorkspaceList.h"
 #include <QApplication>
 #include <QDialog>
+#include <QAction>
 #include <QDir>
 #include <QLabel>
 #include <QPlainTextEdit>
@@ -199,7 +200,12 @@ class ChartMarketContextTest : public QObject {
         auto* timeframes = workspace.findChild<QWidget*>("chartWorkspaceTimeframeButtons");
         auto* conversion = workspace.findChild<QLabel*>("chartPriceConversion");
         auto* related = workspace.findChild<QLabel*>("chartRelatedMarkets");
-        QVERIFY(price && timeframes && conversion && related);
+        auto* toolbar = workspace.findChild<QWidget*>("chartToolbar");
+        auto* title = workspace.findChild<QLabel*>("marketCandlesTitle");
+        auto* sideAction = workspace.findChild<QAction*>("chartSidePanelAction");
+        QVERIFY(price && timeframes && conversion && related && toolbar && title && sideAction);
+        QVERIFY(sideAction->isChecked());
+        QVERIFY(workspace.sidePanelBesideChart());
         QVERIFY(conversion->isHidden()); QVERIFY(related->isHidden());
         const auto priceAt = price->mapTo(&workspace, QPoint()), timeframesAt = timeframes->mapTo(&workspace, QPoint());
         ChartMarketContext context;
@@ -219,11 +225,14 @@ class ChartMarketContextTest : public QObject {
         QVERIFY(conversion->toolTip().contains(QStringLiteral("합성 김프 설명")));
         QCOMPARE(price->mapTo(&workspace, QPoint()), priceAt);
         QCOMPARE(timeframes->mapTo(&workspace, QPoint()), timeframesAt);
-        auto* toolbar=workspace.findChild<QWidget*>("chartToolbar");QVERIFY(toolbar);
-        auto* title=workspace.findChild<QLabel*>("marketCandlesTitle");QVERIFY(title);
-        const QRect titleRect(title->mapTo(toolbar,QPoint()),title->size()),priceRect(price->mapTo(toolbar,QPoint()),price->size());
-        QVERIFY(titleRect.right()<=priceRect.left());QVERIFY(qAbs(titleRect.center().y()-priceRect.center().y())<=2);
-        QVERIFY(toolbar->rect().contains(QRect(timeframes->mapTo(toolbar,QPoint()),timeframes->size())));
+        const auto verifyHeaderGeometry = [&] {
+            const QRect titleRect(title->mapTo(toolbar, QPoint()), title->size());
+            const QRect priceRect(price->mapTo(toolbar, QPoint()), price->size());
+            QVERIFY(titleRect.right() <= priceRect.left());
+            QVERIFY(qAbs(titleRect.center().y() - priceRect.center().y()) <= 2);
+            QVERIFY(toolbar->rect().contains(QRect(timeframes->mapTo(toolbar, QPoint()), timeframes->size())));
+        };
+        verifyHeaderGeometry();
         const auto shownWide = related->accessibleName().split(QStringLiteral(", "), Qt::SkipEmptyParts);
         QVERIFY(!shownWide.isEmpty()); QVERIFY(shownWide.first().startsWith(QStringLiteral("나스닥 100")));
         QVERIFY2(related->sizeHint().width() <= related->width(), "Shown related markets fit without clipping");
@@ -239,24 +248,40 @@ class ChartMarketContextTest : public QObject {
                     .save(QDir(out).filePath(dark ? "chart-header-context-dark.png" : "chart-header-context-light.png")));
             }
         }
+        // Default panel-open layout at 1440: 2 rows keep title/price/conversion and controls clear without overlap.
         workspace.resize(1440, 790);
+        QTRY_VERIFY(workspace.sidePanelBesideChart());
+        QTRY_COMPARE(toolbar->property("rows").toInt(), 2);
+        QVERIFY(toolbar->height() <= 96);
+        verifyHeaderGeometry();
+        if (related->isVisible())
+            QVERIFY2(related->sizeHint().width() <= related->width(), "Default 1440 panel-open related markets fit without clipping");
+        auto* info = toolbar->findChild<InfoButton*>("marketCandlesInformation");
+        QVERIFY(info && info->isVisible());
+        const auto verifyInfoDialog = [&] {
+            info->click();
+            auto* dialog = info->findChild<QDialog*>("infoDialog");
+            auto* body = info->findChild<QPlainTextEdit*>("infoPublicText");
+            QVERIFY(dialog && dialog->isVisible() && body && body->isVisible());
+            const auto text = body->toPlainText();
+            for (const auto& item : context.related) {
+                QVERIFY(text.contains(item.label));
+                if (!item.value.isEmpty()) QVERIFY(text.contains(item.value));
+                QVERIFY(text.contains(item.change));
+                QVERIFY(text.contains(item.detail));
+            }
+            dialog->reject();
+        };
+        verifyInfoDialog();
+
+        // Panel-closed control group at 1440 keeps the compact single-row header.
+        sideAction->setChecked(false);
         QTRY_COMPARE(toolbar->property("rows").toInt(), 1);
         QVERIFY(toolbar->height() <= 44);
         QVERIFY(related->isHidden());
-        auto* info = toolbar->findChild<InfoButton*>("marketCandlesInformation");
-        QVERIFY(info && info->isVisible());
-        info->click();
-        auto* dialog = info->findChild<QDialog*>("infoDialog");
-        auto* body = info->findChild<QPlainTextEdit*>("infoPublicText");
-        QVERIFY(dialog && dialog->isVisible() && body && body->isVisible());
-        const auto text = body->toPlainText();
-        for (const auto& item : context.related) {
-            QVERIFY(text.contains(item.label));
-            if (!item.value.isEmpty()) QVERIFY(text.contains(item.value));
-            QVERIFY(text.contains(item.change));
-            QVERIFY(text.contains(item.detail));
-        }
-        dialog->reject();
+        verifyHeaderGeometry();
+        verifyInfoDialog();
+        sideAction->setChecked(true);
 
         // A narrower window shows fewer whole items, never a cut one.
         workspace.resize(1100, 790);
@@ -373,35 +398,56 @@ class ChartMarketContextTest : public QObject {
         auto* change = workspace.findChild<QLabel*>("chartCurrentPriceReference");
         auto* conversion = workspace.findChild<QLabel*>("chartPriceConversion");
         auto* related = workspace.findChild<QLabel*>("chartRelatedMarkets");
-        QVERIFY(toolbar && title && price && unit && change && conversion && related);
+        auto* sideAction = workspace.findChild<QAction*>("chartSidePanelAction");
+        QVERIFY(toolbar && title && price && unit && change && conversion && related && sideAction);
         QTRY_VERIFY(toolbar->isVisible());
         QCOMPARE(window.width(), 1440);
+        QVERIFY(sideAction->isChecked());
+        QVERIFY(workspace.sidePanelBesideChart());
         QVERIFY(toolbar->width() < window.width());
         QVERIFY(title->accessibleName().contains(QStringLiteral("이더리움")));
         QCOMPARE(price->text(), QStringLiteral("4,745,000"));
         QCOMPARE(unit->text(), QStringLiteral("KRW"));
         QVERIFY(change->isVisible() && change->text().contains(quote.change));
-        QTRY_COMPARE(toolbar->property("rows").toInt(), 1);
+
+        // 1) Default panel-open state at 1440: 2 rows keep title/price/unit/change and context clean without clipping.
+        QTRY_COMPARE(toolbar->property("rows").toInt(), 2);
+        QVERIFY(toolbar->height() <= 96);
         QVERIFY(conversion->isHidden());
-        // Public conversion arrives after the initial price-only layout.
+        const QRect openTitleRect(title->mapTo(toolbar, QPoint()), title->size());
+        const QRect openPriceRect(price->mapTo(toolbar, QPoint()), price->size());
+        QVERIFY(openTitleRect.right() <= openPriceRect.left());
+        QVERIFY(qAbs(openTitleRect.center().y() - openPriceRect.center().y()) <= 2);
         workspace.setMarketContext(context);
+        QTRY_COMPARE(toolbar->property("rows").toInt(), 2);
+        QVERIFY(toolbar->height() <= 96);
+        if (conversion->isVisible())
+            QCOMPARE(conversion->accessibleName(), context.conversion + QStringLiteral(" · ") + context.premium);
+
+        auto* info = toolbar->findChild<InfoButton*>("marketCandlesInformation");
+        QVERIFY(info && info->isVisible());
+        const auto verifyInfoDialog = [&] {
+            info->click();
+            auto* dialog = info->findChild<QDialog*>("infoDialog");
+            auto* body = info->findChild<QPlainTextEdit*>("infoPublicText");
+            QVERIFY(dialog && dialog->isVisible() && body && body->isVisible());
+            const auto text = body->toPlainText();
+            QVERIFY(text.contains(context.conversion));
+            QVERIFY(text.contains(context.premium));
+            QVERIFY(text.contains(context.conversionDetail));
+            QVERIFY(text.contains(context.premiumDetail));
+            dialog->reject();
+        };
+        verifyInfoDialog();
+
+        // 2) Panel-closed control at 1440: full chart width still fits the single-row header.
+        sideAction->setChecked(false);
         QTRY_COMPARE(toolbar->property("rows").toInt(), 1);
         QVERIFY(toolbar->height() <= 44);
         QVERIFY(related->isHidden());
         QVERIFY(conversion->isHidden());
-
-        auto* info = toolbar->findChild<InfoButton*>("marketCandlesInformation");
-        QVERIFY(info && info->isVisible());
-        info->click();
-        auto* dialog = info->findChild<QDialog*>("infoDialog");
-        auto* body = info->findChild<QPlainTextEdit*>("infoPublicText");
-        QVERIFY(dialog && dialog->isVisible() && body && body->isVisible());
-        const auto text = body->toPlainText();
-        QVERIFY(text.contains(context.conversion));
-        QVERIFY(text.contains(context.premium));
-        QVERIFY(text.contains(context.conversionDetail));
-        QVERIFY(text.contains(context.premiumDetail));
-        dialog->reject();
+        verifyInfoDialog();
+        sideAction->setChecked(true);
 
         window.resize(1024, 700);
         QTRY_COMPARE(window.width(), 1024);

@@ -16,7 +16,9 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SUITES = ("kiwoom", "kiwoom_trading", "retired_connections", "connection_form", "local_window", "profile_upgrade", "release_update")
+SUITES = ("kiwoom", "kiwoom_trading", "retired_connections", "connection_form", "local_window",
+          "profile_upgrade", "release_update", "auto_chart_geometry", "chart_timeframe_pins",
+          "chart_side_panel", "market_candles_view", "chart_market_context")
 FORM_CASES = ("kiwoomFilePairIsValidatedBeforeUpdatingEitherField",
               "suspendedBrokersRejectNewAndExistingCredentials", "stockChartChooserUsesLiveBrokersAndReturnsToChart")
 WINDOW_CASES = ("brokerConnectionReturnsToOrigin", "suspendedBrokersKeepOnlyRemovalAction")
@@ -74,7 +76,29 @@ def deploy_dependencies(app, objdump, sdk_bins, env):
 
 
 def run_tests(build, env):
+    # The remaining market-view/context cases include opt-in live network probes. Gate the
+    # packaged chart on offline, real-widget cases for the controls delivered in this build.
     selected = {"connection_form": FORM_CASES, "local_window": WINDOW_CASES,
+                "chart_market_context": ("chartHeaderShowsContextOnlyForItsChart",
+                                         "populatedEtherHeaderFitsTheSingleRowAt1440"),
+                "market_candles_view": (
+                    "autoDrawingButtonRequiresContextClosedUnlockedVisibleAndVerifiedStock",
+                    "autoDrawingButtonStartsPreviewWithoutChangingPublicState",
+                    "escapeDuringAutoPreviewFinishesAtOneThenCancelsOnSecondEscape",
+                    "autoPreviewApplyBatchesSingleUndoReplacesAndRespectsCheckboxes",
+                    "timeframeSwitchClearsAutoPreviewAndPreviewRowsImmediately",
+                    "closedCandleCorrectionClearsAutoPreviewWithoutNewBar",
+                    "objectsPanelEyeLockDeleteInPlaceUpdateAndFocusPreservation",
+                    "fibLabelsRespect18PxMinimumSpacingAndOffscreenAxisTags",
+                    "fibLabelsUsePriceAxisAndKeepPriceGrid",
+                    "appliedDrawingsDoNotAlterAutoPriceScaleBounds",
+                    "lockedShapeHoverShowsArrowCursorInsteadOfOpenHand",
+                    "autoDrawingFailureShowsVisibleTransientFeedbackAndClearsOnSwitch",
+                    "lowTrendlineSweepMarkerDrawsBelowLowEvenWithLongerUpperWick",
+                    "gappedAutoTrendUsesTheSameObservedPathForPreviewApplyAndHit",
+                    "similarityComparisonTablePaintsDirectlyHighlightsNavigatesAndCollapses",
+                    "controlModifierStrongMagnetSnapsWithin24PxWithoutFocusSteal",
+                    "strongMagnetUsesCurrentFrameAndCircularPixelRadius"),
                 "profile_upgrade": ("emptyStateCreatesOnlyTheNewIdentity",)}
     results = {}
     failures = []

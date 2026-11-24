@@ -170,14 +170,19 @@ class UsabilityCleanupTest final:public QObject {
         QVERIFY(scroll->viewport()->rect().intersects(panelRect));
         // C12 starts with current status; historical results occupy the same
         // panel only after the visible scorecard control is activated.
-        auto* summary=panel->findChild<QWidget*>("chartIndicatorSummary");
-        auto* toggle=panel->findChild<QPushButton*>("chartIndicatorScoreToggle");
-        auto* scoreScroll=panel->findChild<QScrollArea*>("chartIndicatorScoreBody");
-        auto* score=panel->findChild<QLabel*>("chartStudyScorecard");
+        // v6.1 Step 2-7: from ChartWorkspace::SidePanelCollapseWidth the same
+        // evidence card stands beside the chart; below it, inside this panel.
+        auto* evidence=workspace.findChild<QWidget*>("chartScorePanel");QVERIFY(evidence);
+        if(width<ChartWorkspace::SidePanelCollapseWidth)QVERIFY(panel->isAncestorOf(evidence));
+        else QVERIFY(evidence->mapTo(scroll->widget(),QPoint()).x()>=chartTop.x()+chart->width());
+        auto* summary=evidence->findChild<QWidget*>("chartIndicatorSummary");
+        auto* toggle=evidence->findChild<QPushButton*>("chartIndicatorScoreToggle");
+        auto* scoreScroll=evidence->findChild<QScrollArea*>("chartIndicatorScoreBody");
+        auto* score=evidence->findChild<QLabel*>("chartStudyScorecard");
         QVERIFY(summary&&toggle&&scoreScroll&&score);QVERIFY(summary->isVisible());
         QVERIFY(!scoreScroll->isVisible());QVERIFY(!score->isVisible());
         for(const auto* name:{"chartWorkspaceUnlock","chartIndicatorSummary","chartIndicatorScoreToggle"}){
-            auto* content=panel->findChild<QWidget*>(name);QVERIFY(content);QVERIFY(content->isVisible());
+            auto* content=(qstrcmp(name,"chartWorkspaceUnlock")==0?panel:evidence)->findChild<QWidget*>(name);QVERIFY(content);QVERIFY(content->isVisible());
             scroll->ensureWidgetVisible(content,0,0);QCoreApplication::processEvents();
             const QRect contentRect(content->mapTo(scroll->viewport(),QPoint()),content->size());
             QVERIFY2(scroll->viewport()->rect().contains(contentRect),name);

@@ -116,6 +116,7 @@ void ChartWorkspace::setWatchlistModel(WatchlistWorkspaceList* model) {
 void ChartWorkspace::setChartSettings(QSettings* settings) {
     if(chartSettings_==settings)return;
     chartSettings_=settings;
+    restoreTimeframePins();
     sectionExpansion_.clear();
     renderedListId_.clear();
     refreshWatchlistRows();

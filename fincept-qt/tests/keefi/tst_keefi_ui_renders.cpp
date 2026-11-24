@@ -601,8 +601,10 @@ class KeefiUiRenderProbe final : public QObject {
         qInfo() << "synthetic candle geometry, default" << (dark ? "dark" : "light") << size << chart->size();
         if(size.width()==1440){
             QVERIFY2(chart->height()>=500,"The default candle canvas must retain the Dev94 minimum");
-            QCOMPARE(toolbar->property("rows").toInt(),1);
-            QVERIFY(toolbar->height()<=44);
+            // v6.1 Step 2-7: beside the 360 px right panel the toolbar takes its two rows.
+            const int rows=workspace->sidePanelBesideChart()?2:1;
+            QCOMPARE(toolbar->property("rows").toInt(),rows);
+            QVERIFY(toolbar->height()<=(rows==2?96:44));
         }
         QVERIFY(toolbar->height()<=96);
         QVERIFY2(window.rect().contains(QRect(chart->mapTo(&window,QPoint{}),chart->size())),

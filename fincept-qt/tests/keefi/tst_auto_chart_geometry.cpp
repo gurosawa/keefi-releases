@@ -1,6 +1,9 @@
 #include "keefi/AutoChartGeometry.h"
+#include "keefi/ChartTimeAxis.h"
+#include "keefi/StockChartTypes.h"
 #include "keefi/ChartDrawings.h"
 #include <QTest>
+#include <algorithm>
 #include <cmath>
 
 using namespace keefi;
@@ -58,11 +61,14 @@ class AutoChartGeometryTest final : public QObject {
   private slots:
     void invalidShortAndZeroAtrFramesFailWithExactReasons();
     void zigzagPivotsConfirmAlternatingExtremesAndSkipReversalOnNewHighBar();
+    void equalHighAndLowPivotsKeepEarliestConfirmedBar();
     void disconnectedStockBarUsesOnlyHighMinusLowForTrueRange();
     void fibCandidatesSupportTwoAndThreePointWavesInBothDirections();
+    void fibCandidatesUseLastThreePivotsWhenFourOrMoreExist();
     void horizontalLevelsClusterWithinToleranceAndRankTopThree();
     void sidewaysZoneSelectsLatestConsolidationAndExcludesEqualPrices();
     void trendlineTracksTouchesRejectsTwoPiercesAndCollectsWickSweeps();
+    void gapTrendUsesObservedBarIndexOnCoinAndStockAxes();
     void resultsAreDeterministicAndPreserveRawBarTimestampsAndStrings();
     void candidatesApplyCleanlyIntoChartDrawingsBatch();
 };
@@ -143,6 +149,39 @@ void AutoChartGeometryTest::zigzagPivotsConfirmAlternatingExtremesAndSkipReversa
     QCOMPARE(res.pivots[0].bar, 5);  QCOMPARE(res.pivots[0].high, false); QCOMPARE(res.pivots[0].price, QString("96.00"));
     QCOMPARE(res.pivots[1].bar, 9);  QCOMPARE(res.pivots[1].high, true);  QCOMPARE(res.pivots[1].price, QString("116.00"));
     QCOMPARE(res.pivots[2].bar, 11); QCOMPARE(res.pivots[2].high, false); QCOMPARE(res.pivots[2].price, QString("92.00"));
+}
+
+void AutoChartGeometryTest::equalHighAndLowPivotsKeepEarliestConfirmedBar() {
+    // Last 20 bars (indices 8..27) have exact TR = 2.0 -> ATR20 = 2.0, theta = 4.0.
+    QList<SimpleBar> bars(28, {100, 101.0, 99.0, 100.0});
+    bars[0] = {100, 101.0,  99.0, 100.0};
+    bars[1] = {100, 110.0, 100.0, 108.0}; // upHit -> confirms bar 0 LOW(99), dir=+1, cand=1(110)
+    bars[2] = {108, 110.0, 107.0, 109.0}; // equal HIGH(110) must keep bar 1, NOT move to bar 2
+    bars[3] = {109, 109.0, 102.0, 103.0}; // confirms HIGH(110) @ bar 1, dir=-1, cand=3(102)
+    bars[4] = {103, 104.0,  96.0,  97.0}; // new LOW(96) -> cand=4
+    bars[5] = { 97,  98.0,  96.0,  97.0}; // equal LOW(96) must keep bar 4, NOT move to bar 5
+    bars[6] = { 97, 105.0,  97.0, 104.0}; // confirms LOW(96) @ bar 4, dir=+1, cand=6(105)
+    bars[7] = {104, 104.0, 100.0, 100.0}; // confirms HIGH(105) @ bar 6, dir=-1, cand=7(100)
+    const auto res = AutoChartGeometry::analyze(buildFrame(bars));
+    QVERIFY(res.available);
+    QVERIFY(std::abs(res.atr - 2.0) <= 1e-6);
+    QCOMPARE(res.pivots.size(), 4);
+    QCOMPARE(res.pivots[0].bar, 0); QCOMPARE(res.pivots[0].high, false);
+    QCOMPARE(res.pivots[1].bar, 1); QCOMPARE(res.pivots[1].high, true);  QCOMPARE(res.pivots[1].price, QString("110.00"));
+    QCOMPARE(res.pivots[2].bar, 4); QCOMPARE(res.pivots[2].high, false); QCOMPARE(res.pivots[2].price, QString("96.00"));
+    QCOMPARE(res.pivots[3].bar, 6); QCOMPARE(res.pivots[3].high, true);  QCOMPARE(res.pivots[3].price, QString("105.00"));
+
+    // Initial undecided phase (dir == 0): equal high on bar 0 & bar 1 must keep earliest bar 0.
+    QList<SimpleBar> initTie(24, {92, 93.0, 91.0, 92.0});
+    initTie[0] = {100, 102.0, 99.0, 100.0};
+    initTie[1] = {100, 102.0, 99.0, 100.0}; // equal high & low while dir==0
+    initTie[2] = {100, 100.0, 91.0,  92.0}; // downHit (102-91=11 >= 4) confirms bar 0 HIGH(102)
+    initTie[3] = { 92,  93.0, 91.0,  92.0};
+    const auto initRes = AutoChartGeometry::analyze(buildFrame(initTie));
+    QVERIFY(initRes.available);
+    QVERIFY(!initRes.pivots.isEmpty());
+    QCOMPARE(initRes.pivots[0].bar, 0);
+    QCOMPARE(initRes.pivots[0].high, true);
 }
 
 void AutoChartGeometryTest::disconnectedStockBarUsesOnlyHighMinusLowForTrueRange() {
@@ -253,6 +292,55 @@ void AutoChartGeometryTest::fibCandidatesSupportTwoAndThreePointWavesInBothDirec
     checkExt3(dnExt, 240.0, 160.0, 205.0);
 }
 
+void AutoChartGeometryTest::fibCandidatesUseLastThreePivotsWhenFourOrMoreExist() {
+    // 32 bars: indices 12..31 have exact TR = 2.0 -> ATR20 = 2.0, theta = 4.0.
+    // Confirms 5 pivots: P0(bar 0, L 99), P1(bar 1, H 111), P2(bar 2, L 101), P3(bar 3, H 116), P4(bar 4, L 105).
+    // Fib must use last 3 pivots [P2, P3, P4] = [101, 116, 105], never [P0, P1].
+    QList<SimpleBar> bars(32, {110, 111.0, 109.0, 110.0});
+    bars[0] = {100, 101.0,  99.0, 100.0};
+    bars[1] = {100, 111.0, 100.0, 110.0}; // confirms P0(bar 0, L 99)
+    bars[2] = {110, 111.0, 101.0, 102.0}; // confirms P1(bar 1, H 111)
+    bars[3] = {102, 116.0, 102.0, 115.0}; // confirms P2(bar 2, L 101)
+    bars[4] = {115, 115.0, 105.0, 106.0}; // confirms P3(bar 3, H 116)
+    bars[5] = {106, 112.0, 106.0, 111.0}; // confirms P4(bar 4, L 105), cand=5(112)
+    for (int i = 6; i < 12; ++i) bars[i] = {110, 111.5, 109.5, 110.0};
+
+    const auto frame = buildFrame(bars);
+    const auto res = AutoChartGeometry::analyze(frame);
+    QVERIFY(res.available);
+    QCOMPARE(res.pivots.size(), 5);
+    const auto* ret = findCandidate(res, "fib-retracement");
+    const auto* ext = findCandidate(res, "fib-extension");
+    QVERIFY(ret && ext);
+    QCOMPARE(ret->anchors.size(), 2);
+    QCOMPARE(ret->anchors[0].atMs, frame.bars[2].candle.startsAtMs);
+    QCOMPARE(ret->anchors[0].price, QString("101.00"));
+    QCOMPARE(ret->anchors[1].atMs, frame.bars[3].candle.startsAtMs);
+    QCOMPARE(ret->anchors[1].price, QString("116.00"));
+
+    QCOMPARE(ext->anchors.size(), 3);
+    QCOMPARE(ext->anchors[0].atMs, frame.bars[2].candle.startsAtMs);
+    QCOMPARE(ext->anchors[0].price, QString("101.00"));
+    QCOMPARE(ext->anchors[1].atMs, frame.bars[3].candle.startsAtMs);
+    QCOMPARE(ext->anchors[1].price, QString("116.00"));
+    QCOMPARE(ext->anchors[2].atMs, frame.bars[4].candle.startsAtMs);
+    QCOMPARE(ext->anchors[2].price, QString("105.00"));
+
+    ChartDrawing retDraw;
+    retDraw.kind = ret->kind;
+    retDraw.anchors = ret->anchors;
+    const auto retLevels = ChartDrawings::fibLevels(retDraw);
+    bool checked618 = false;
+    for (const auto& lvl : retLevels) {
+        if (std::abs(lvl.ratio - 0.618) <= 1e-6) {
+            const double expected = 116.0 - 0.618 * (116.0 - 101.0); // 106.73
+            QVERIFY2(std::abs(lvl.price - expected) <= 1e-6, qPrintable(QString::number(lvl.price)));
+            checked618 = true;
+        }
+    }
+    QVERIFY(checked618);
+}
+
 void AutoChartGeometryTest::horizontalLevelsClusterWithinToleranceAndRankTopThree() {
     // Craft 4 distinct level clusters (40 bars so ATR20 is clean ~2.0, tol = 1.0):
     // Cluster A near 90: touches=2 (far from lastClose=100)
@@ -348,8 +436,8 @@ void AutoChartGeometryTest::sidewaysZoneSelectsLatestConsolidationAndExcludesEqu
         bars.append({105, 110, 100, 105}); // TR = 10 on i=5..13
     bars.append({105, 130, 95, 105}); // bar 14 spike range 35 (> ZoneRangeAtr*ATR20) breaks backward consolidation at index 15!
     for (int i = 15; i < 25; ++i) {
-        if (i == 16) bars.append({100, 104.5, 99.0, 101}); // zone max high = 104.50
-        else if (i == 21) bars.append({100, 102.0, 97.5, 100}); // zone min low = 97.50
+        if (i == 16) bars.append({100, 104.5, 99.0, 101, true, QStringLiteral("104.500"), {}}); // zone max high = 104.500 raw string
+        else if (i == 21) bars.append({100, 102.0, 97.5, 100, true, {}, QStringLiteral("97.500")}); // zone min low = 97.500 raw string
         else bars.append({100, 102.0, 99.0, 100});
     }
     const auto frame = buildFrame(bars);
@@ -358,10 +446,13 @@ void AutoChartGeometryTest::sidewaysZoneSelectsLatestConsolidationAndExcludesEqu
     const auto* zone = findCandidate(res, "zone");
     QVERIFY(zone);
     QCOMPARE(zone->anchors.size(), 2);
+    // Boundary timestamps come from [start, end] while prices preserve exact raw high/low strings within [start..end].
     QCOMPARE(zone->anchors[0].atMs, frame.bars[15].candle.startsAtMs);
-    QCOMPARE(zone->anchors[0].price, QString("104.50"));
+    QCOMPARE(zone->anchors[0].price, frame.bars[16].candle.high);
+    QCOMPARE(zone->anchors[0].price, QString("104.500"));
     QCOMPARE(zone->anchors[1].atMs, frame.bars[24].candle.startsAtMs);
-    QCOMPARE(zone->anchors[1].price, QString("97.50"));
+    QCOMPARE(zone->anchors[1].price, frame.bars[21].candle.low);
+    QCOMPARE(zone->anchors[1].price, QString("97.500"));
 
     // Equal prices inside the last >= 8 bars -> no zone candidate created
     auto flatEnd = bars;
@@ -405,6 +496,7 @@ void AutoChartGeometryTest::trendlineTracksTouchesRejectsTwoPiercesAndCollectsWi
     QVERIFY(trend);
     QCOMPARE(trend->touches, 3);
     QCOMPARE(trend->anchors.size(), 2);
+    QCOMPARE(trend->trendHighSide, false);
     QVERIFY(trend->sweepAtMs.contains(frame.bars[18].candle.startsAtMs));
 
     auto pierced = bars;
@@ -414,6 +506,117 @@ void AutoChartGeometryTest::trendlineTracksTouchesRejectsTwoPiercesAndCollectsWi
     const auto piercedRes = AutoChartGeometry::analyze(buildFrame(pierced));
     QVERIFY(piercedRes.available);
     QVERIFY(!findCandidate(piercedRes, "trend"));
+}
+
+void AutoChartGeometryTest::gapTrendUsesObservedBarIndexOnCoinAndStockAxes() {
+    // 1-minute coin candles with a 12-minute gap between bar 8 and bar 9 (bar 9..39 shifted by +12 slots):
+    // Low pivot 1 @ bar 2 (slot 2) = 100.0
+    // Low pivot 3 @ bar 10 (slot 22) = 108.0
+    // On ChartTimeAxis::utc, the display line at bar 6 (slot 6) is 100 + 8 * (6 - 2) / (22 - 2) = 101.60.
+    // The observed-bar index contract requires 100 + 8 * (6 - 2) / (10 - 2) = 104.00.
+    constexpr qint64 Minute = 60000;
+    const auto makeGapFrame = [&](double bar6Low) {
+        QList<SimpleBar> bars(40, {110, 111.0, 109.0, 110.0});
+        bars[0]  = {110, 111.0, 109.0, 110.0};
+        bars[1]  = {110, 110.5, 105.0, 106.0};
+        bars[2]  = {106, 107.0, 100.0, 102.0}; // Low pivot 1 @ bar 2 = 100.0
+        bars[3]  = {102, 110.0, 102.0, 109.0};
+        bars[4]  = {109, 118.0, 109.0, 116.0}; // High peak @ bar 4 = 118.0
+        bars[5]  = {116, 116.5, 109.0, 110.0};
+        bars[6]  = {110, 110.5, bar6Low, bar6Low + 1.0}; // Low pivot 2 @ bar 6
+        bars[7]  = {105, 118.0, 105.0, 117.0};
+        bars[8]  = {117, 131.0, 117.0, 130.0}; // High peak @ bar 8 = 131.0
+        bars[9]  = {130, 130.5, 118.0, 119.0}; // +12 missing minutes before bar 9
+        bars[10] = {119, 120.0, 108.0, 110.0}; // Low pivot 3 @ bar 10 (slot 22) = 108.0
+        bars[11] = {110, 117.0, 110.0, 116.0};
+        bars[12] = {116, 124.0, 116.0, 123.0};
+        for (int i = 13; i < 20; ++i) bars[i] = {122, 124.0, 121.0, 122.0};
+        for (int i = 20; i < 40; ++i) bars[i] = {150, 151.0, 149.0, 150.0};
+        auto frame = buildFrame(bars, {"coin", "upbit", "KRW-SYN"}, "KRW", Minute);
+        for (int i = 9; i < frame.bars.size(); ++i) {
+            frame.bars[i].candle.startsAtMs += 12 * Minute;
+            frame.bars[i].completesAtMs += 12 * Minute;
+        }
+        frame.bars[9].connectsPrevious = false;
+        frame.asOfMs = frame.bars.last().completesAtMs + 1000;
+        return frame;
+    };
+
+    const auto frame = makeGapFrame(104.0);
+    const auto result = AutoChartGeometry::analyze(frame);
+    const auto* trend = findCandidate(result, "trend");
+    QVERIFY(trend);
+    QCOMPARE(trend->touches, 3);
+    QVERIFY(!trend->trendHighSide);
+    const auto displayOnly = AutoChartGeometry::analyze(makeGapFrame(101.6));
+    QVERIFY(!findCandidate(displayOnly, "trend"));
+
+    QList<MarketCandle> rows;
+    for (const auto& bar : frame.bars) rows.append(bar.candle);
+    const auto coinAxis = ChartTimeAxis::utc(rows, Minute);
+    QVERIFY(coinAxis.available);
+    const auto verifyPath = [&](const ChartTimeAxis& axis, double lastSlot) {
+        const auto path = AutoChartGeometry::trendDisplayPath(trend->anchors, frame, axis);
+        QCOMPARE(path.size(), 4);
+        QCOMPARE(path.first(), QPointF(2, 100));
+        QCOMPARE(path.last(), QPointF(lastSlot, 108));
+        QCOMPARE(path[1], QPointF(8, 106));
+        QCOMPARE(path[2], QPointF(lastSlot - 1, 107));
+        const double priceAtThirdTouch = path[0].y() + (path[1].y() - path[0].y()) *
+            (6 - path[0].x()) / (path[1].x() - path[0].x());
+        QCOMPARE(priceAtThirdTouch, 104.0);
+        auto reversePath = path;
+        std::reverse(reversePath.begin(), reversePath.end());
+        QCOMPARE(AutoChartGeometry::trendDisplayPath({trend->anchors[1], trend->anchors[0]}, frame, axis),
+                 reversePath);
+    };
+    verifyPath(coinAxis, 22);
+    const auto at = rows[2].startsAtMs;
+    QCOMPARE(AutoChartGeometry::trendDisplayPath({{at, "100"}, {at, "108"}}, frame, coinAxis),
+             QList<QPointF>({{2, 100}, {2, 108}}));
+    QVERIFY(AutoChartGeometry::trendDisplayPath({{at - 20 * Minute, "100"}, {at, "108"}}, frame, coinAxis).isEmpty());
+
+    // Case 3: high-side descending trendline marks trendHighSide == true.
+    QList<SimpleBar> highBars(40, {100, 101.0, 99.0, 100.0});
+    highBars[0]  = {140, 141.0, 139.0, 140.0};
+    highBars[1]  = {140, 146.0, 140.0, 145.0};
+    highBars[2]  = {145, 150.0, 144.0, 148.0}; // High pivot 1 @ bar 2 = 150.0
+    highBars[3]  = {148, 148.0, 138.0, 139.0};
+    highBars[4]  = {139, 139.0, 128.0, 130.0}; // Low trough @ bar 4 = 128.0
+    highBars[5]  = {130, 140.0, 130.0, 139.0};
+    highBars[6]  = {139, 146.0, 138.0, 144.0}; // High pivot 2 @ bar 6 = 146.0
+    highBars[7]  = {144, 144.0, 130.0, 131.0};
+    highBars[8]  = {131, 131.0, 118.0, 120.0}; // Low trough @ bar 8 = 118.0
+    highBars[9]  = {120, 134.0, 120.0, 133.0};
+    highBars[10] = {133, 142.0, 132.0, 140.0}; // High pivot 3 @ bar 10 = 142.0
+    highBars[11] = {140, 140.0, 130.0, 131.0};
+    highBars[12] = {131, 131.0, 124.0, 125.0};
+    for (int i = 13; i < 20; ++i) highBars[i] = {122, 123.0, 120.0, 121.0};
+    for (int i = 20; i < 40; ++i) highBars[i] = { 90,  91.0,  89.0,  90.0};
+    const auto highRes = AutoChartGeometry::analyze(buildFrame(highBars));
+    QVERIFY(highRes.available);
+    const auto* highTrend = findCandidate(highRes, "trend");
+    QVERIFY(highTrend);
+    QCOMPARE(highTrend->trendHighSide, true);
+    QCOMPARE(highTrend->touches, 3);
+
+    ChartStudyTimeline timeline;
+    for (int i = 0; i < rows.size(); ++i) {
+        ChartStudyTimelineRow entry;
+        entry.startsAtMs = rows[i].startsAtMs;
+        entry.connectsPrevious = i > 0 && i != 9;
+        entry.missingSlotsBefore = i == 9 ? 8 : 0;
+        timeline.rows.append(entry);
+    }
+    const auto stockAxis = ChartTimeAxis::stock(rows, Minute, timeline);
+    QVERIFY(stockAxis.available);
+    auto stockFrame = frame;
+    stockFrame.identity = {"stock", "KR", "005930"};
+    const auto stockResult = AutoChartGeometry::analyze(stockFrame);
+    const auto* stockTrend = findCandidate(stockResult, "trend");
+    QVERIFY(stockTrend);
+    QCOMPARE(stockTrend->anchors, trend->anchors);
+    verifyPath(stockAxis, 18);
 }
 
 void AutoChartGeometryTest::resultsAreDeterministicAndPreserveRawBarTimestampsAndStrings() {

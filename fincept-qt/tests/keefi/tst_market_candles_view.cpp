@@ -14,11 +14,13 @@
 #include "keefi/Vault.h"
 #include "keefi/ChartDrawings.h"
 #include "keefi/AutoChartGeometry.h"
+#include "keefi/CandleChart_p.h"
 #include "keefi/MovementColorPolicy.h"
 #include "keefi/ChartShareCard.h"
 #include "keefi/KeefiFonts.h"
 #include "keefi/PortfolioPresentation.h"
 #include <QFile>
+#include <QKeySequence>
 #include <QDateTime>
 #include <QApplication>
 #include <QDir>
@@ -434,6 +436,12 @@ class MarketCandlesViewTest:public QObject{
     void fibLabelsUsePriceAxisAndKeepPriceGrid();
     void appliedDrawingsDoNotAlterAutoPriceScaleBounds();
     void lockedShapeHoverShowsArrowCursorInsteadOfOpenHand();
+    void autoDrawingFailureShowsVisibleTransientFeedbackAndClearsOnSwitch();
+    void lowTrendlineSweepMarkerDrawsBelowLowEvenWithLongerUpperWick();
+    void similarityComparisonTablePaintsDirectlyHighlightsNavigatesAndCollapses();
+    void controlModifierStrongMagnetSnapsWithin24PxWithoutFocusSteal();
+    void strongMagnetUsesCurrentFrameAndCircularPixelRadius();
+    void gappedAutoTrendUsesTheSameObservedPathForPreviewApplyAndHit();
     void autoPreviewHoverAndRenderProbeWhenAsked();
 };
 void MarketCandlesViewTest::dev86CoreStatesStayVisibleOutsideCandles_data(){
@@ -3030,6 +3038,437 @@ void MarketCandlesViewTest::lockedShapeHoverShowsArrowCursorInsteadOfOpenHand(){
     QTest::mouseMove(chart,onLine+QPoint(1,0));
     QVERIFY(chart->cursor().shape()!=Qt::OpenHandCursor);
     QCOMPARE(chart->cursor().shape(),Qt::ArrowCursor);
+}
+void MarketCandlesViewTest::autoDrawingFailureShowsVisibleTransientFeedbackAndClearsOnSwitch(){
+    AutoDrawingFixture f(syntheticStudyRows(10));
+    auto* status=f.view.findChild<QLabel*>("chartDrawingStatus");
+    QVERIFY(status);
+    QVERIFY(status->isHidden());
+    QVERIFY(f.autoBtn()->isEnabled());
+    QTest::mouseClick(f.autoBtn(),Qt::LeftButton);
+    QCoreApplication::processEvents();
+    // Must stay visible across a normal refresh pass, not get hidden or overwritten.
+    f.view.setSelection("coin:upbit:KRW-SYN",60000);
+    QCoreApplication::processEvents();
+    QVERIFY2(status->isVisible(),"Auto drawing failure reason must be visibly presented to the user");
+    QVERIFY2(status->text().contains(QStringLiteral("완료 봉이 21개 이상 필요해요")),qPrintable(status->text()));
+    // Switching timeframe clears the transient failure message.
+    f.view.setSelection("coin:upbit:KRW-SYN",300000);
+    QCoreApplication::processEvents();
+    QVERIFY(status->isHidden());
+
+    // applyBatch failure also surfaces visibly instead of failing silently.
+    AutoDrawingFixture f2;
+    auto* status2=f2.view.findChild<QLabel*>("chartDrawingStatus");
+    QVERIFY(status2 && status2->isHidden());
+    QTest::mouseClick(f2.autoBtn(),Qt::LeftButton);
+    QTest::keyClick(f2.chart(),Qt::Key_Escape);
+    QCoreApplication::processEvents();
+    f2.drawings.setLocked(true);
+    QCoreApplication::processEvents();
+    QTest::mouseClick(f2.applyBtn(),Qt::LeftButton);
+    QCoreApplication::processEvents();
+    QVERIFY2(status2->isVisible(),"applyBatch failure must surface visibly");
+    QVERIFY(!status2->text().isEmpty());
+}
+void MarketCandlesViewTest::lowTrendlineSweepMarkerDrawsBelowLowEvenWithLongerUpperWick(){
+    KeefiTheme::instance()->setMode(ThemeMode::Light);
+    const qint64 end=StudyNow/60000*60000;
+    struct Spec{double o,h,l,c;};
+    QList<Spec> specs(40,{110,111.0,109.0,110.0});
+    specs[0] ={110,111.0,109.0,110.0};
+    specs[1] ={110,110.5,105.0,106.0};
+    specs[2] ={106,107.0,100.0,102.0}; // Low pivot 1 @ bar 2 = 100
+    specs[3] ={102,110.0,102.0,109.0};
+    specs[4] ={109,118.0,109.0,116.0};
+    specs[5] ={116,116.5,109.0,110.0};
+    specs[6] ={110,110.5,104.0,105.0}; // Low pivot 2 @ bar 6 = 104
+    specs[7] ={105,118.0,105.0,117.0};
+    specs[8] ={117,131.0,117.0,130.0};
+    specs[9] ={130,130.5,118.0,119.0};
+    specs[10]={119,120.0,108.0,110.0}; // Low pivot 3 @ bar 10 = 108
+    specs[11]={110,117.0,110.0,116.0};
+    specs[12]={116,124.0,116.0,123.0};
+    for(int i=13;i<=17;++i)specs[i]={122,124.0,121.0,122.0};
+    // Bar 18: line(18)=116, low=112 (4 below), high=122.5 (6.5 above — longer upper wick!), close=118 -> lower sweep!
+    specs[18]={122,122.5,112.0,118.0};
+    specs[19]={118,125.0,118.0,124.0};
+    for(int i=20;i<40;++i)specs[i]={150,151.0,149.0,150.0};
+    QList<MarketCandle> rows;
+    for(int i=0;i<specs.size();++i){
+        const qint64 at=end-(specs.size()-i)*60000;
+        rows.append({at,at+1000,QString::number(specs[i].o,'f',2),QString::number(specs[i].h,'f',2),QString::number(specs[i].l,'f',2),QString::number(specs[i].c,'f',2),"5"});
+    }
+    AutoDrawingFixture f(rows);
+    auto* chart=f.chart();QVERIFY(chart);
+    QTest::mouseClick(f.autoBtn(),Qt::LeftButton);
+    QTest::keyClick(chart,Qt::Key_Escape);
+    QCoreApplication::processEvents();
+    auto* trendCb=f.view.findChild<QCheckBox*>("chartDrawingPreviewCheck_trend");
+    QVERIFY(trendCb);
+    for(auto* cb:f.previewChecks())if(cb!=trendCb)cb->setChecked(false);
+    QCoreApplication::processEvents();
+    const double plotTop=chart->property("viewportPlotTop").toDouble();
+    const double plotW=chart->property("viewportPlotWidth").toDouble();
+    const double plotH=chart->property("viewportPlotHeight").toDouble();
+    const double pLow=chart->property("viewportPriceLow").toDouble();
+    const double pHigh=chart->property("viewportPriceHigh").toDouble();
+    const double firstBarX=chart->property("viewportFirstBarX").toDouble();
+    const double spanSlots=chart->property("viewportSpanSlots").toDouble();
+    QVERIFY(plotW>100&&plotH>100&&pHigh>pLow&&spanSlots>0);
+    const double sx=firstBarX+18.0/spanSlots*plotW;
+    const double lowY=plotTop+(pHigh-112.0)/(pHigh-pLow)*plotH;
+    const double highY=plotTop+(pHigh-122.5)/(pHigh-pLow)*plotH;
+    const QImage img=chart->grab().toImage();
+    const double dpr=img.devicePixelRatio();
+    const QColor accent=themeColors().accent;
+    const auto accentInBox=[&](double x0,double x1,double y0,double y1){
+        int count=0;
+        const int ix0=qMax(0,qFloor(x0*dpr)),ix1=qMin(img.width()-1,qCeil(x1*dpr));
+        const int iy0=qMax(0,qFloor(y0*dpr)),iy1=qMin(img.height()-1,qCeil(y1*dpr));
+        for(int y=iy0;y<=iy1;++y)for(int x=ix0;x<=ix1;++x){
+            const QColor c=img.pixelColor(x,y);
+            if(qAbs(c.red()-accent.red())<=12&&qAbs(c.green()-accent.green())<=12&&qAbs(c.blue()-accent.blue())<=12)++count;
+        }
+        return count;
+    };
+    const int belowLow=accentInBox(sx-5,sx+5,lowY+1,lowY+12);
+    const int aboveHigh=accentInBox(sx-5,sx+5,highY-12,highY-1);
+    QVERIFY2(belowLow>=4,qPrintable(QStringLiteral("Expected lower-wick sweep marker below lowY=%1, found %2 px").arg(lowY).arg(belowLow)));
+    QCOMPARE(aboveHigh,0);
+}
+void MarketCandlesViewTest::similarityComparisonTablePaintsDirectlyHighlightsNavigatesAndCollapses(){
+    KeefiTheme::instance()->setMode(ThemeMode::Light);
+    StudyTransport transport;
+    MarketCandles source(&transport,std::unique_ptr<PublicCandleSocket>{},[]{return StudyNow;});
+    ChartStudyPreferences preferences;preferences.markIntroSeen();
+    for(const auto* id:{"pullback","cloud","volume","whales"})preferences.setEnabled(id,false);
+    preferences.setEnabled("similarity",true);preferences.setVisible("similarity",true);
+    MarketCandlesView view(&source);
+    view.setStyleSheet(KeefiTheme::localStyleSheet(&view));
+    view.setIndicatorPreferences(&preferences);
+    view.setSelection("coin:upbit:KRW-SYN",60000);
+    view.resize(1280,900);view.show();
+    auto history=syntheticStudyRows(200);
+    for(int i=0;i<history.size();++i){
+        const double scale=std::pow(1.025,i/20);
+        auto& row=history[i];
+        for(auto* value:{&row.open,&row.high,&row.low,&row.close})
+            *value=QString::number(value->toDouble()*scale,'f',7);
+    }
+    emit transport.finished(transport.token,syntheticStudyResponse(history));
+    QTRY_VERIFY(view.chartStudies().similarity.available&&view.chartStudies().similarity.paths.size()==3);
+    auto* chart=view.findChild<QWidget*>("marketCandlesChart");QVERIFY(chart);
+    // Ensure direct painting (no visible child widget or table widget created inside CandleChart).
+    for(auto* child:chart->findChildren<QWidget*>())QVERIFY2(child->isHidden(),qPrintable(child->metaObject()->className()));
+    const QImage baseImg=chart->grab().toImage();
+    QCoreApplication::processEvents();
+    QVERIFY(chart->property("similarityTableVisible").toBool());
+    QVERIFY(chart->property("similarityTableExpanded").toBool());
+    QCOMPARE(chart->property("similarityTitle").toString(),QStringLiteral("닮은꼴 · 과거 비교"));
+    QCOMPARE(chart->property("similarityDisclaimer").toString(),QStringLiteral("과거 경로 · 예측 아님"));
+    const QStringList tableRows=chart->property("similarityTableRows").toStringList();
+    const auto& paths=view.chartStudies().similarity.paths;
+    QCOMPARE(tableRows.size(),paths.size());
+    const QTimeZone kst("Asia/Seoul");
+    for(int i=0;i<paths.size();++i){
+        const auto parts=tableRows[i].split('|');
+        QCOMPARE(parts.size(),4);
+        QCOMPARE(parts[0],QString::number(i+1));
+        QCOMPARE(parts[1],QDateTime::fromMSecsSinceEpoch(paths[i].toMs,kst).toString(QStringLiteral("yy.MM.dd HH:mm")));
+        QCOMPARE(parts[2],QString::number(paths[i].correlation,'f',2));
+        QVERIFY(!parts[2].contains('%'));
+        // Every group of 20 bars contains the same path at 1.025 times the prior price.
+        QCOMPARE(parts[3],QStringLiteral("+2.5%"));
+        QVERIFY(!tableRows[i].contains("Echo")&&!tableRows[i].contains(QChar(0x2460)));
+    }
+    const QVariantList rowRects=chart->property("similarityRowRects").toList();
+    QCOMPARE(rowRects.size(),paths.size());
+    // Hovering a table row must highlight the path, never emit leaveEvent, and never steal focus.
+    class LeaveSpy final:public QObject{
+      public:int leaves=0;
+        bool eventFilter(QObject*,QEvent* ev)override{if(ev->type()==QEvent::Leave)++leaves;return false;}
+    } leaveSpy;
+    chart->installEventFilter(&leaveSpy);
+    auto* focusKeeper=view.findChild<QToolButton*>("chartDrawingTool_crosshair");QVERIFY(focusKeeper);
+    focusKeeper->setFocus();QCoreApplication::processEvents();
+    QCOMPARE(QApplication::focusWidget(),focusKeeper);
+    const QPoint row1Center=rowRects[1].toRectF().center().toPoint();
+    QMouseEvent hoverEv(QEvent::MouseMove,row1Center,chart->mapToGlobal(row1Center),Qt::NoButton,Qt::NoButton,Qt::NoModifier);
+    QCoreApplication::sendEvent(chart,&hoverEv);QCoreApplication::processEvents();
+    const QImage hoverImg=chart->grab().toImage();
+    QCOMPARE(chart->property("similarityHoverRow").toInt(),1);
+    QCOMPARE(chart->cursor().shape(),Qt::PointingHandCursor);
+    QCOMPARE(leaveSpy.leaves,0);
+    QCOMPARE(QApplication::focusWidget(),focusKeeper);
+    const auto table=chart->property("similarityTableRect").toRectF().adjusted(-6,-6,6,6);
+    const auto plot=static_cast<market_candles_detail::CandleChart*>(chart)->studyViewport();
+    const auto latest=plot.axis.coordinateAt(paths[1].points.first().atMs);
+    QVERIFY(latest.has_value());
+    const double projectionLeft=plot.priceArea.left()+(*latest-plot.slotsRange.first)/
+        (plot.slotsRange.second-plot.slotsRange.first)*plot.priceArea.width();
+    const auto ink=themeColors().studyBlue;
+    const auto matches=[&](QColor pixel){
+        return std::abs(pixel.red()-ink.red())<24&&std::abs(pixel.green()-ink.green())<24&&std::abs(pixel.blue()-ink.blue())<24;
+    };
+    const double dpr=hoverImg.devicePixelRatio();
+    int newPathPixels=0;
+    for(int y=qCeil(plot.priceArea.top()*dpr);y<qFloor(plot.priceArea.bottom()*dpr);++y){
+        for(int x=qCeil(projectionLeft*dpr);x<qFloor(plot.priceArea.right()*dpr);++x){
+            if(table.contains(QPointF(x/dpr,y/dpr)))continue;
+            if(matches(hoverImg.pixelColor(x,y))&&!matches(baseImg.pixelColor(x,y)))++newPathPixels;
+        }
+    }
+    QVERIFY2(newPathPixels>8,"Expected a highlighted trajectory in the projection outside the table");
+
+    const auto renderDir=qEnvironmentVariable("KEEFI_STEP2_COMPLETE_RENDER_DIR");
+    if(!renderDir.isEmpty()){
+        QVERIFY(QDir().mkpath(renderDir));
+        QVERIFY(view.grab().save(QDir(renderDir).filePath("step2-4-similarity-table-hover-light.png")));
+    }
+
+    // Clicking row 1 navigates to path[1].fromMs -> leaves right edge -> table auto-hides.
+    QTest::mouseClick(chart,Qt::LeftButton,Qt::NoModifier,row1Center);
+    QCoreApplication::processEvents();
+    chart->grab();
+    QVERIFY(view.visibleViewport().fromMs<=paths[1].fromMs&&view.visibleViewport().toMs>=paths[1].fromMs);
+    QVERIFY(!chart->property("similarityTableVisible").toBool());
+
+    // Pressing End returns to live right edge and restores the table.
+    QTest::keyClick(chart,Qt::Key_End);
+    QCoreApplication::processEvents();
+    chart->grab();
+    QVERIFY(chart->property("similarityTableVisible").toBool());
+
+    // Narrow chart width collapses to 1-line summary and expands on hover.
+    view.resize(420,700);QCoreApplication::processEvents();
+    chart->grab();
+    QVERIFY(chart->property("similarityTableVisible").toBool());
+    QVERIFY(!chart->property("similarityTableExpanded").toBool());
+    QCOMPARE(chart->property("similarityTableSummary").toString(),QStringLiteral("닮은꼴 3 · 이후 20봉 평균 +2.5%"));
+    const QPoint pillCenter=chart->property("similarityTableRect").toRectF().center().toPoint();
+    QMouseEvent expandEv(QEvent::MouseMove,pillCenter,chart->mapToGlobal(pillCenter),Qt::NoButton,Qt::NoButton,Qt::NoModifier);
+    QCoreApplication::sendEvent(chart,&expandEv);QCoreApplication::processEvents();
+    chart->grab();
+    QVERIFY(chart->property("similarityTableExpanded").toBool());
+}
+void MarketCandlesViewTest::controlModifierStrongMagnetSnapsWithin24PxWithoutFocusSteal(){
+    KeefiTheme::instance()->setMode(ThemeMode::Light);
+    const qint64 end=StudyNow/60000*60000;
+    QList<MarketCandle> rows;
+    for(int i=0;i<6;++i){
+        const qint64 at=end-(6-i)*60000;
+        if(i==4)rows.append({at,at+1000,"50","90","10","50","5"}); // sets wide vertical range ~10..90
+        else rows.append({at,at+1000,"50","52","48","50","5"});    // bar 2 has clean high=52 with plenty of vertical clearance above
+    }
+    AutoDrawingFixture f(rows);
+    auto* chart=f.chart();QVERIFY(chart);
+    QVERIFY(!f.drawings.magnetEnabled());
+    auto* magnetBtn=f.view.findChild<QToolButton*>("chartDrawingMagnet");QVERIFY(magnetBtn);
+    const QString nativeCtrl=QKeySequence(Qt::CTRL).toString(QKeySequence::NativeText);
+    QVERIFY2(magnetBtn->toolTip().contains(nativeCtrl),qPrintable(magnetBtn->toolTip()));
+
+    auto* focusKeeper=f.autoBtn();QVERIFY(focusKeeper);
+    focusKeeper->setFocus();QCoreApplication::processEvents();
+    QCOMPARE(QApplication::focusWidget(),focusKeeper);
+
+    const double plotTop=chart->property("viewportPlotTop").toDouble();
+    const double plotW=chart->property("viewportPlotWidth").toDouble();
+    const double plotH=chart->property("viewportPlotHeight").toDouble();
+    const double pLow=chart->property("viewportPriceLow").toDouble();
+    const double pHigh=chart->property("viewportPriceHigh").toDouble();
+    const double firstBarX=chart->property("viewportFirstBarX").toDouble();
+    const double spanSlots=chart->property("viewportSpanSlots").toDouble();
+    const int cx=qRound(firstBarX+2.0/spanSlots*plotW);
+    const int highY=qRound(plotTop+(pHigh-52.0)/(pHigh-pLow)*plotH);
+    const QPoint within24(cx,highY-16);  // 16px away: > default 8px, <= strong 24px
+    const QPoint outside24(cx,highY-32); // 32px away: > strong 24px
+    QVERIFY(outside24.y()>qCeil(plotTop)+10);
+
+    // 1) Qt::MetaModifier must NOT trigger strong magnet.
+    QMouseEvent metaMove(QEvent::MouseMove,within24,chart->mapToGlobal(within24),Qt::NoButton,Qt::NoButton,Qt::MetaModifier);
+    QCoreApplication::sendEvent(chart,&metaMove);QCoreApplication::processEvents();
+    QVERIFY(!chart->property("magnetStrongActive").toBool());
+    QVERIFY(!chart->property("magnetSnapActive").toBool());
+
+    // 2) Baseline image with NoModifier at within24 (no snap ring).
+    QMouseEvent freeMove(QEvent::MouseMove,within24,chart->mapToGlobal(within24),Qt::NoButton,Qt::NoButton,Qt::NoModifier);
+    QCoreApplication::sendEvent(chart,&freeMove);QCoreApplication::processEvents();
+    const QImage beforeImg=chart->grab().toImage();
+    QVERIFY(!chart->property("magnetSnapActive").toBool());
+
+    // 3) Qt::ControlModifier within 24px snaps to high=52, paints snap ring, steals no focus, shows no bottom caption.
+    QMouseEvent ctrlMove(QEvent::MouseMove,within24,chart->mapToGlobal(within24),Qt::NoButton,Qt::NoButton,Qt::ControlModifier);
+    QCoreApplication::sendEvent(chart,&ctrlMove);QCoreApplication::processEvents();
+    const QImage snappedImg=chart->grab().toImage();
+    QVERIFY(chart->property("magnetStrongActive").toBool());
+    QVERIFY(chart->property("magnetSnapActive").toBool());
+    QCOMPARE(chart->property("magnetSnapField").toString(),QStringLiteral("high"));
+    QCOMPARE(chart->property("magnetSnapPrice").toString(),QStringLiteral("52"));
+    QCOMPARE(QApplication::focusWidget(),focusKeeper);
+    QVERIFY(f.view.findChild<QLabel*>("chartDrawingStatus")->isHidden());
+    QVERIFY2(snappedImg!=beforeImg,"Strong magnet must paint OHLC snap ring");
+
+    const auto renderDir=qEnvironmentVariable("KEEFI_STEP2_COMPLETE_RENDER_DIR");
+    if(!renderDir.isEmpty()){
+        QVERIFY(QDir().mkpath(renderDir));
+        QVERIFY(f.view.grab().save(QDir(renderDir).filePath("step2-5-magnet-snap-ring-light.png")));
+    }
+
+    // 4) Outside 24px with ControlModifier stays free (does not snap to "52").
+    QMouseEvent ctrlFar(QEvent::MouseMove,outside24,chart->mapToGlobal(outside24),Qt::NoButton,Qt::NoButton,Qt::ControlModifier);
+    QCoreApplication::sendEvent(chart,&ctrlFar);QCoreApplication::processEvents();
+    QVERIFY(chart->property("magnetStrongActive").toBool());
+    QVERIFY(!chart->property("magnetSnapActive").toBool());
+
+    // 5) Placing Horizontal line with ControlModifier within 24px saves exact OHLC "52".
+    QTest::mouseClick(f.view.findChild<QToolButton*>("chartDrawingTool_horizontal"),Qt::LeftButton);
+    QTest::mouseClick(chart,Qt::LeftButton,Qt::ControlModifier,within24);
+    QCoreApplication::processEvents();
+    QCOMPARE(f.drawings.drawings().size(),1);
+    QCOMPARE(f.drawings.drawings().first().anchors.first().price,QStringLiteral("52"));
+
+    // Recompute coordinates after horizontal line selection opens drawingLinePanel_.
+    const double plotTop2=chart->property("viewportPlotTop").toDouble();
+    const double plotH2=chart->property("viewportPlotHeight").toDouble();
+    const double pLow2=chart->property("viewportPriceLow").toDouble();
+    const double pHigh2=chart->property("viewportPriceHigh").toDouble();
+    const int highY2=qRound(plotTop2+(pHigh2-52.0)/(pHigh2-pLow2)*plotH2);
+    const QPoint outside24After(cx,highY2-32);
+    QTest::mouseClick(f.view.findChild<QToolButton*>("chartDrawingTool_horizontal"),Qt::LeftButton);
+    QTest::mouseClick(chart,Qt::LeftButton,Qt::ControlModifier,outside24After);
+    QCoreApplication::processEvents();
+    QCOMPARE(f.drawings.drawings().size(),2);
+    QVERIFY(f.drawings.drawings().last().anchors.first().price!=QStringLiteral("52"));
+}
+namespace {
+struct DrawingCanvas {
+    ChartDrawings drawings;
+    market_candles_detail::CandleChart chart{nullptr};
+    ChartDrawingFrame frame;
+    DrawingCanvas(){
+        chart.resize(1440,900);
+        chart.show();
+    }
+    void setRows(const QList<MarketCandle>& rows,const QString& symbol){
+        const ChartDrawingContext context{{"coin","upbit",symbol},"KRW",true};
+        QVERIFY(drawings.setContext(context,60000));
+        frame={context.identity,context.currency,60000,rows.last().startsAtMs+60000,drawings.contextGeneration(),{}};
+        for(const auto& row:rows){
+            const bool adjacent=!frame.bars.isEmpty()&&row.startsAtMs==frame.bars.last().completesAtMs;
+            frame.bars.append({row,row.startsAtMs+60000,true,adjacent});
+        }
+        QVERIFY(ChartDrawings::validFrame(frame));
+        chart.setContext(60000,"KRW",symbol);
+        chart.setObservation(rows,{});
+        chart.setDrawingFrame(&drawings,frame);
+        QCoreApplication::processEvents();
+        chart.grab();
+    }
+    QPointF pixel(qint64 at,double price)const{
+        const auto viewport=chart.studyViewport();
+        const auto slot=viewport.axis.coordinateAt(at).value();
+        const auto range=viewport.slotsRange;
+        const auto low=chart.property("viewportPriceLow").toDouble();
+        const auto high=chart.property("viewportPriceHigh").toDouble();
+        return {viewport.priceArea.left()+(slot-range.first)/(range.second-range.first)*viewport.priceArea.width(),
+                viewport.priceArea.top()+(high-price)/(high-low)*viewport.priceArea.height()};
+    }
+    void move(const QPointF& position,Qt::KeyboardModifiers modifiers){
+        QMouseEvent event(QEvent::MouseMove,position,chart.mapToGlobal(position),Qt::NoButton,Qt::NoButton,modifiers);
+        QCoreApplication::sendEvent(&chart,&event);
+        chart.grab();
+    }
+};
+}
+
+void MarketCandlesViewTest::strongMagnetUsesCurrentFrameAndCircularPixelRadius(){
+    DrawingCanvas canvas;
+    QList<MarketCandle> rows;
+    const qint64 start=StudyNow/60000*60000-60*60000;
+    for(int i=0;i<60;++i){
+        const qint64 at=start+i*60000;
+        rows.append({at,at+1000,"50",i==55?"90":"52",i==55?"10":"48","50","5"});
+    }
+    canvas.setRows(rows,"KRW-SYN");
+    auto& chart=canvas.chart;
+    auto high=canvas.pixel(rows[50].startsAtMs,52);
+    const auto pointer=high+QPointF(0,-16);
+    canvas.move(pointer,Qt::ControlModifier);
+    QVERIFY(chart.property("magnetSnapActive").toBool());
+    QVERIFY(QLineF(chart.property("magnetSnapPos").toPointF(),high).length()<.01);
+    auto corrected=rows;
+    corrected[50].high="70";
+    // Adjacent bars must not provide a second candidate within the radius.
+    corrected[49].high=corrected[51].high="70";
+    canvas.setRows(corrected,"KRW-SYNB");
+    QVERIFY(!chart.property("magnetSnapActive").toBool());
+    canvas.setRows(rows,"KRW-SYN");
+    canvas.move(pointer,Qt::ControlModifier);
+    QVERIFY(chart.property("magnetSnapActive").toBool());
+    chart.zoom(-40);
+    chart.grab();
+    if(chart.property("magnetSnapActive").toBool()){
+        const auto current=chart.property("magnetSnapPos").toPointF();
+        QVERIFY(QLineF(pointer,current).length()<=24.000001);
+        QVERIFY(QLineF(high,current).length()>1);
+    }
+    high=canvas.pixel(rows[50].startsAtMs,52);
+    for(const QPointF offset:{QPointF(24,0),QPointF(0,-24),QPointF(14.4,-19.2)}){
+        canvas.move(high+offset,Qt::ControlModifier);
+        QVERIFY(chart.property("magnetSnapActive").toBool());
+        QVERIFY(QLineF(chart.property("magnetSnapPos").toPointF(),high).length()<.01);
+    }
+    for(const QPointF offset:{QPointF(30,0),QPointF(18,-18),QPointF(0,-24.1)}){
+        canvas.move(high+offset,Qt::ControlModifier);
+        QVERIFY(!chart.property("magnetSnapActive").toBool());
+    }
+}
+
+void MarketCandlesViewTest::gappedAutoTrendUsesTheSameObservedPathForPreviewApplyAndHit(){
+    DrawingCanvas canvas;
+    QList<MarketCandle> rows;
+    const qint64 start=StudyNow/60000*60000-40*60000;
+    for(int i=0;i<18;++i){
+        const auto at=start+(i+(i>=8?12:0))*60000;
+        rows.append({at,at+1000,"104","112","96","104","5"});
+    }
+    canvas.setRows(rows,"KRW-SYN");
+    auto& chart=canvas.chart;
+    AutoChartCandidate candidate;
+    candidate.kind=ChartDrawingKind::Trend;
+    candidate.key="trend";
+    candidate.anchors={{rows[2].startsAtMs,"100"},{rows[10].startsAtMs,"108"}};
+    const auto expected=canvas.pixel(rows[6].startsAtMs,104);
+    const auto chord=canvas.pixel(rows[6].startsAtMs,101.6);
+    const auto nearBlue=[&](const QPointF& point){
+        const auto image=chart.grab().toImage();
+        const auto dpr=image.devicePixelRatio();
+        const auto ink=themeColors().studyBlue;
+        for(int y=qFloor((point.y()-2)*dpr);y<=qCeil((point.y()+2)*dpr);++y){
+            for(int x=qFloor((point.x()-2)*dpr);x<=qCeil((point.x()+2)*dpr);++x){
+                if(!image.rect().contains(x,y))continue;
+                const auto pixel=image.pixelColor(x,y);
+                if(std::abs(pixel.red()-ink.red())<20&&std::abs(pixel.green()-ink.green())<20&&std::abs(pixel.blue()-ink.blue())<20)return true;
+            }
+        }
+        return false;
+    };
+    QVERIFY(!nearBlue(expected));
+    chart.setAutoPreview({{candidate,true}},canvas.frame);
+    chart.finishAutoPreview();
+    QVERIFY(nearBlue(expected));
+    QVERIFY(!nearBlue(chord));
+    chart.clearAutoPreview();
+    ChartDrawing drawing;drawing.kind=candidate.kind;drawing.anchors=candidate.anchors;
+    QVERIFY(canvas.drawings.applyBatch({drawing},canvas.frame));
+    chart.setDrawingFrame(&canvas.drawings,canvas.frame);
+    QVERIFY(nearBlue(expected));
+    QVERIFY(!nearBlue(chord));
+    canvas.move(expected,Qt::NoModifier);
+    QCOMPARE(chart.cursor().shape(),Qt::OpenHandCursor);
+    canvas.move(chord,Qt::NoModifier);
+    QVERIFY(chart.cursor().shape()!=Qt::OpenHandCursor);
 }
 void MarketCandlesViewTest::autoPreviewHoverAndRenderProbeWhenAsked(){
     const auto renderDir=qEnvironmentVariable("KEEFI_STEP23_RENDER_DIR");

@@ -10,6 +10,8 @@
 #include "keefi/ExtendedChartStudies.h"
 #include "keefi/ChartMarketContext.h"
 #include "keefi/HoldingMarketResolver.h"
+#include "keefi/ChartTimeframePins.h"
+#include "keefi/SplitterShare.h"
 
 class QAction;
 class QLabel;
@@ -28,6 +30,11 @@ class QDialog;
 class QPushButton;
 class QHBoxLayout;
 class QSettings;
+class QSplitter;
+class QStackedWidget;
+class QTabBar;
+class QScrollArea;
+class QBoxLayout;
 
 namespace keefi {
 class MarketCandles;
@@ -44,6 +51,7 @@ struct WatchlistEntry;
 class ChartStudyPreferences;
 class StockChartSource;
 class CoinFlowSource;
+class CoinTapeView;
 class ChartStudyFeed;
 class ChartPublicContextSource;
 class PublicMarketCatalog;
@@ -77,6 +85,14 @@ ChartFuturesPosition projectChartFuturesPosition(const PositionRecord&, const Ma
 class ChartWorkspace final : public QWidget {
     Q_OBJECT
   public:
+    // Right panel beside a single chart. Below CollapseWidth of window width or
+    // when the viewport cannot keep the actual CandleChart canvas >= ChartMinimumWidth
+    // (680) plus its pane margins and drawing rail (84) beside SidePanelMinimumWidth
+    // (280), it moves into the details disclosure under the chart, as in grid mode.
+    static constexpr int SidePanelCollapseWidth = 1080, SidePanelMinimumWidth = 280;
+    static constexpr int SidePanelDefaultWidth = 320, SidePanelWideWidth = 360, SidePanelWideWindowWidth = 1440;
+    static constexpr int ChartMinimumWidth = 680, ChartColumnChromeWidth = 84;
+    static constexpr int ChartColumnMinimumWidth = ChartMinimumWidth + ChartColumnChromeWidth;
     explicit ChartWorkspace(MarketCandles*, PortfolioController*, QWidget* parent = nullptr);
     ~ChartWorkspace() override;
     void setAsset(const QString&);
@@ -119,6 +135,10 @@ class ChartWorkspace final : public QWidget {
     // Public header context for one chart identity (won value, premium, related markets).
     // Shown only while that identity is selected; never stored with the chart.
     void setMarketContext(const ChartMarketContext&);
+    // The 체결·청산 tab is on screen. Public trade collection follows this.
+    bool coinTapeVisible() const;
+    bool sidePanelBesideChart() const { return sidePlaced_; }
+    const ChartTimeframePins& timeframePins() const { return timeframePins_; }
   signals:
     void holdingMarketSelected(QString assetKey,QString marketKey);
     void assetCardRequested(QString assetKey);
@@ -134,6 +154,7 @@ class ChartWorkspace final : public QWidget {
     void coinFlowStudiesChanged();
     void publicFlowObservationReady(const keefi::CoinFlowSnapshot&,const keefi::CoinFlowStudySet&,const keefi::ExtendedStrongReversal&);
     void futuresPositionObservationsChanged();
+    void coinTapeVisibilityChanged(bool visible);
   protected:
     void resizeEvent(QResizeEvent*) override;
     void showEvent(QShowEvent*) override;
@@ -202,6 +223,14 @@ class ChartWorkspace final : public QWidget {
     void openBrowserContextMenu(const QString&, const QStringList&, const QPoint&);
     void addWatchlistIdentity();
     void openShareCard();
+    void buildSidePanel(QBoxLayout* panels);
+    void layoutSidePanel();
+    void updateCoinTapeVisibility();
+    void updateDetailsToggleText();
+    void restoreTimeframePins();
+    void refreshTimeframeButtons();
+    void setTimeframePinned(qint64 intervalMs, bool pinned);
+    void openTimeframeList(QWidget* anchor);
     QPointer<PortfolioController> portfolio_;
     QPointer<ChartStudyPreferences> indicatorPreferences_;
     QPointer<ChartDrawings> drawings_;
@@ -313,6 +342,18 @@ class ChartWorkspace final : public QWidget {
     QStringList publishedVisibleRows_;
     bool renderingLists_ = false, mutatingLists_ = false, visibleRowsPending_ = false;
     std::function<void()> syncTimeframeButtons_;
+    ChartTimeframePins timeframePins_;
+    QToolButton* timeframeList_ = nullptr;
+    QPointer<QMenu> timeframeMenu_;
+    QAction *timeframeFavorites_ = nullptr, *sidePanelAction_ = nullptr;
+    QScrollArea* scroll_ = nullptr;
+    QSplitter* sideSplitter_ = nullptr;
+    QWidget *chartColumn_ = nullptr, *sidePanel_ = nullptr;
+    QTabBar* sideTabs_ = nullptr;
+    QStackedWidget* sideStack_ = nullptr;
+    CoinTapeView* tape_ = nullptr;
+    SplitterShare sideShare_{0.25};
+    bool sidePlaced_ = false, sideOpen_ = true, sideUserSized_ = false, sideLayoutActive_ = false, coinTapeShown_ = false;
     bool clearingPrivate_ = false;
     QString selectedChartIdentity_ = "coin:upbit:KRW-BTC";
     QString renderedListId_;

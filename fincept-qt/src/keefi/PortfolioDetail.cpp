@@ -607,18 +607,13 @@ void ListDetailView::applyMode() {
     detail_->setVisible(detailShown_);
 }
 
-void ListDetailView::rememberDetailShare() {
-    const auto sizes = splitter_->sizes();
-    if (sizes.size() == 2 && sizes[0] > 0 && sizes[1] > 0)
-        detailShare_ = double(sizes[1]) / (sizes[0] + sizes[1]);
-}
+void ListDetailView::rememberDetailShare() { detailShare_.remember(*splitter_); }
 
 void ListDetailView::restoreDetailShare() {
-    const int width = splitter_->contentsRect().width() - splitter_->handleWidth();
+    const int width = SplitterShare::extent(*splitter_);
     if (width <= 0) return;
     const int floor = qMin(DetailMinimumWidth, width / 2);
-    const int detail = qBound(floor, qRound(width * detailShare_), width - floor);
-    splitter_->setSizes({width - detail, detail});
+    detailShare_.restore(*splitter_, floor, floor);
 }
 
 } // namespace keefi

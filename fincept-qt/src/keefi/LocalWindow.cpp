@@ -603,6 +603,8 @@ LocalWindow::~LocalWindow() {
     if(chartKiwoomStream_)disconnect(chartKiwoomStream_,nullptr,this,nullptr);
     revokeKiwoomMarketAuthorization();
     chartCoinFlowStopping_=true;
+    // The tape's last hide arrives while child widgets are deleted, after these members.
+    if(chartWorkspace_)disconnect(chartWorkspace_,&ChartWorkspace::coinTapeVisibilityChanged,this,nullptr);
     if(chartCoinFlowRefresh_)chartCoinFlowRefresh_->stop();
     if(chartCoinFlow_)disconnect(chartCoinFlow_,nullptr,this,nullptr);
     if(chartFlowMinutes_)disconnect(chartFlowMinutes_,nullptr,this,nullptr);

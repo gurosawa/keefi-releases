@@ -90,6 +90,7 @@ class CandleChart final:public QWidget {
     bool event(QEvent* event)override;
     void wheelEvent(QWheelEvent* event)override;
     void keyPressEvent(QKeyEvent* e)override;
+    void keyReleaseEvent(QKeyEvent* e)override;
     void resizeEvent(QResizeEvent* event)override;
     void leaveEvent(QEvent*)override;
     void mousePressEvent(QMouseEvent* e)override;
@@ -135,13 +136,29 @@ class CandleChart final:public QWidget {
         bool followsLive=false;
         bool operator==(const GeometryState&)const=default;
     };
+    struct SimilarityTableLayout {
+        bool visible=false,expanded=false,alwaysExpanded=false;
+        QRectF box,collapsedRect,projectionRect;
+        QList<QRectF> rowRects;
+        QList<double> colWidths;
+        QString title,disclaimer,summary;
+        struct Row { QString rank,endText,corrText,afterText; int direction=0; };
+        QList<Row> rows;
+    };
     void includeVisiblePriceStudies(Geometry& plot)const;
     Geometry plotGeometry()const;
     Geometry calculatePlotGeometry()const;
     QRectF liveTradeRegion(const Geometry& plot,const QString& price)const;
     void paintLiveTrade(QPainter& painter,const Geometry& plot)const;
+    SimilarityTableLayout similarityTableLayout(const Geometry& plot)const;
+    void paintSimilarityOverlay(QPainter& painter,const Geometry& plot);
+    static bool strongMagnetActive(Qt::KeyboardModifiers eventModifiers);
+    void updateMagnetSnap(const Geometry& plot);
+    void paintMagnetSnapRing(QPainter& painter)const;
+    QPolygonF autoTrendPixels(const QList<ChartDrawingPoint>& anchors,const Geometry& plot)const;
     std::optional<QPointF> drawingPosition(const ChartDrawingPoint& point,const Geometry& plot)const;
-    std::optional<ChartDrawingPoint> pointerAnchor(const QPointF& pos,const Geometry& plot)const;
+    std::optional<ChartDrawingPoint> pointerAnchor(const QPointF& pos,const Geometry& plot,
+        Qt::KeyboardModifiers modifiers=Qt::NoModifier,ChartDrawingSnap* snapOut=nullptr)const;
     QPair<QString,int> hitDrawing(const QPointF& pos,const Geometry& plot)const;
     // Whole-shape drag: whole completed bars horizontally (never between bars), price by pixel
     // resolution. A horizontal line keeps its anchor time and moves its price only.
@@ -194,6 +211,11 @@ class CandleChart final:public QWidget {
     QList<FibAxisLabel> fibAxisLabels_;
     std::optional<FibAxisLabel> offscreenTopTag_,offscreenBottomTag_;
     QPointF movePressPos_,hoverPos_;bool hoverInside_=false;
+    bool similarityTableHovered_=false;int similarityHoverRow_=-1;
+    Qt::KeyboardModifiers lastModifiers_=Qt::NoModifier;
+    mutable std::optional<bool> validSnapFrame_;
+    std::optional<QPointF> magnetSnapPos_;QString magnetSnapField_,magnetSnapPrice_;bool magnetStrongActive_=false,magnetGeometryDirty_=true;
+    static constexpr double DefaultMagnetRadiusPx=8.0,StrongMagnetRadiusPx=24.0;
     static constexpr qint64 StaticLayerMaxAgeMs=500; // Bounds any change that reached the widget without refresh().
     QPixmap staticLayer_;QList<quint64> staticKey_;bool staticDirty_=true;QElapsedTimer staticAge_;QRegion hoverRegion_;
     bool stock_=false;ChartStudyTimeline timeline_;

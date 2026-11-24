@@ -160,6 +160,8 @@ class MarketCandlesView final:public QWidget {
     void layoutDrawingObjectsPanel();
     void syncDrawingObjectsPanel();
     bool drawingContextEditable() const;
+    void showDrawingFeedback(const QString& text);
+    void clearDrawingFeedback();
     QPointer<MarketCandles> model_;
     quint64 refreshRevision_ = 0;
     QPointer<ChartInstrumentPresentation> instrumentPresentation_;
@@ -286,6 +288,9 @@ class MarketCandlesView final:public QWidget {
     void undoDrawing(bool redo);
     void refreshChartStyleButton();
     QLabel *drawingStatus_=nullptr,*drawingLineStatus_=nullptr;
+    QString drawingFeedbackText_;
+    quint64 drawingFeedbackGen_=0;
+    QTimer* drawingFeedbackTimer_=nullptr;
     QCheckBox* drawingLineEnabled_=nullptr;
     QComboBox *drawingLineOwner_=nullptr,*drawingLineInterval_=nullptr;
     QPushButton *drawingLineSettings_=nullptr,*drawingLineDelete_=nullptr;

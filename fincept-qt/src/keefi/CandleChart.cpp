@@ -20,6 +20,7 @@
 #include "keefi/MovementDirection.h"
 
 #include <QElapsedTimer>
+#include <QGuiApplication>
 #include <QPaintEngine>
 #include <QPixmap>
 #include <QtMath>
@@ -272,7 +273,7 @@ void CandleChart::setLiveTradePrice(const QString& price,qint64 tradeAtMs){
         else if(!region.isEmpty())QWidget::update(region.toAlignedRect());
     }
 
-void CandleChart::resetViewport(){syncRange_={};setSyncedCrosshair(0);offset_=0;projectionSlots_=drawingPadding_=edgePadding_=0;wheelAxis_=0;wheelTravel_={};zoomRemainder_=0;hover_=-1;priceScale_=1;axisDragging_=false;publishViewport();refresh();}
+void CandleChart::resetViewport(){syncRange_={};setSyncedCrosshair(0);offset_=0;projectionSlots_=drawingPadding_=edgePadding_=0;wheelAxis_=0;wheelTravel_={};zoomRemainder_=0;hover_=-1;similarityTableHovered_=false;similarityHoverRow_=-1;priceScale_=1;axisDragging_=false;publishViewport();refresh();}
 
 void CandleChart::returnToLive(bool user){syncRange_={};offset_=0;edgePadding_=0;const auto axis=timeAxis();projectionSlots_=computedProjectionSlots(axis);drawingPadding_=computedDrawingPadding(axis);publishViewport();refresh();if(user)publishUserNavigation(false);}
 
@@ -302,6 +303,7 @@ void CandleChart::setStudies(const ChartStudySet& studies,const QSet<QString>& l
         if(layers_.contains("ma")!=layers.contains("ma")||layers_.contains("bb")!=layers.contains("bb"))
             priceStudyBounds_.reset();
         studies_=studies;layers_=layers;
+        if(similarityHoverRow_>=studies_.similarity.paths.size())similarityHoverRow_=-1;
         // A historical viewport owns its scale. A worker clearing/reapplying
         // latest-reference projections must not resize or move that viewport.
         if(!syncRange_.valid()&&offset_<.000001)projectionSlots_=computedProjectionSlots(timeAxis());
@@ -345,7 +347,7 @@ void CandleChart::setDrawingFrame(ChartDrawings* model,const ChartDrawingFrame& 
             clearAutoPreview();
             if(autoPreviewCancelled)autoPreviewCancelled();
         }
-        drawingModel_=model;drawingFrame_=frame;
+        drawingModel_=model;drawingFrame_=frame;validSnapFrame_.reset();
         const bool hadVisibleFib=hasVisibleFib_;
         hasVisibleFib_=false;
         if(drawingModel_){
@@ -550,6 +552,15 @@ void CandleChart::wheelEvent(QWheelEvent* event){
     }
 
 void CandleChart::keyPressEvent(QKeyEvent* e){
+        if(e->key()==Qt::Key_Control){
+            lastModifiers_|=Qt::ControlModifier;
+            if(hoverInside_){
+                const auto plot=plotGeometry();
+                updateMagnetSnap(plot);
+                if(plot.available)hoverUpdate(plot.area,std::numeric_limits<double>::quiet_NaN());
+            }
+            QWidget::keyPressEvent(e);return;
+        }
         if(e->key()==Qt::Key_Escape){
             if(autoPreviewActive()){
                 if(autoPreviewRunning()||autoPreviewProgress_<1.0)finishAutoPreview();
@@ -565,21 +576,64 @@ void CandleChart::keyPressEvent(QKeyEvent* e){
         else if(e->key()==Qt::Key_Plus||e->key()==Qt::Key_Equal)zoom(-10);else if(e->key()==Qt::Key_Minus)zoom(10);else QWidget::keyPressEvent(e);
     }
 
-void CandleChart::resizeEvent(QResizeEvent* event){QWidget::resizeEvent(event);publishViewport();}
+void CandleChart::keyReleaseEvent(QKeyEvent* e){
+        if(e->key()==Qt::Key_Control){
+            lastModifiers_&=~Qt::ControlModifier;
+            if(hoverInside_){
+                const auto plot=plotGeometry();
+                updateMagnetSnap(plot);
+                if(plot.available)hoverUpdate(plot.area,std::numeric_limits<double>::quiet_NaN());
+            }
+        }
+        QWidget::keyReleaseEvent(e);
+    }
 
-void CandleChart::leaveEvent(QEvent*){hoverRegion_={};hover_=-1;hoverInside_=false;if(crosshairHovered)crosshairHovered(0);QToolTip::hideText();update();}
+void CandleChart::resizeEvent(QResizeEvent* event){QWidget::resizeEvent(event);magnetGeometryDirty_=true;publishViewport();}
+
+void CandleChart::leaveEvent(QEvent*){
+        hoverRegion_={};hover_=-1;hoverInside_=false;
+        similarityTableHovered_=false;similarityHoverRow_=-1;
+        lastModifiers_=Qt::NoModifier;
+        magnetSnapPos_.reset();magnetSnapField_.clear();magnetSnapPrice_.clear();magnetStrongActive_=false;
+        setProperty("magnetSnapActive",false);setProperty("magnetStrongActive",false);
+        setProperty("magnetSnapField",QString{});setProperty("magnetSnapPrice",QString{});setProperty("magnetSnapPos",QPointF{});
+        setProperty("similarityHoverRow",-1);
+        unsetCursor();
+        if(crosshairHovered)crosshairHovered(0);QToolTip::hideText();update();
+    }
 
 void CandleChart::mousePressEvent(QMouseEvent* e){
         if(e->button()!=Qt::LeftButton)return;
+        lastModifiers_=e->modifiers();
         if(autoPreviewRunning()||(autoPreviewActive()&&autoPreviewProgress_<1.0)){
             finishAutoPreview();e->accept();return;
         }
         const auto plot=plotGeometry();
         // Dragging the price axis changes the vertical scale; double-click on it restores automatic.
         if(onPriceAxis(e->position())){axisDragging_=true;axisPressY_=e->position().y();axisPressScale_=priceScale_;setCursor(Qt::SizeVerCursor);e->accept();return;}
+        if(tool_==ChartDrawingTool::Crosshair&&plot.available){
+            const auto sim=similarityTableLayout(plot);
+            if(sim.visible&&sim.expanded){
+                for(int i=0;i<sim.rowRects.size()&&i<studies_.similarity.paths.size();++i){
+                    if(sim.rowRects[i].contains(e->position())){
+                        const qint64 targetMs=studies_.similarity.paths[i].fromMs;
+                        similarityHoverRow_=-1;similarityTableHovered_=false;
+                        setProperty("similarityHoverRow",-1);
+                        unsetCursor();
+                        navigateToTime(targetMs,true);
+                        e->accept();return;
+                    }
+                }
+                if(sim.box.contains(e->position())){e->accept();return;}
+            }else if(sim.visible&&sim.collapsedRect.contains(e->position())){
+                similarityTableHovered_=true;
+                hoverUpdate(plot.area,std::numeric_limits<double>::quiet_NaN());
+                e->accept();return;
+            }
+        }
         if(drawingModel_&&drawingModel_->visible()&&plot.available){
             if(tool_!=ChartDrawingTool::Crosshair&&!drawingModel_->locked()){
-                const auto point=pointerAnchor(e->position(),plot);if(!point){feedback(tr("실제로 완료된 봉 위에서 가격·시각을 선택하세요."));return;}
+                const auto point=pointerAnchor(e->position(),plot,e->modifiers());if(!point){feedback(tr("실제로 완료된 봉 위에서 가격·시각을 선택하세요."));return;}
                 const auto kind=tool_==ChartDrawingTool::Horizontal?ChartDrawingKind::Horizontal:tool_==ChartDrawingTool::Trend?ChartDrawingKind::Trend:ChartDrawingKind::Measure;
                 QString created;
                 if(kind==ChartDrawingKind::Horizontal){QString error;created=drawingModel_->create(kind,{*point},drawingFrame_,&error);if(created.isEmpty())feedback(error);}
@@ -614,9 +668,13 @@ void CandleChart::mousePressEvent(QMouseEvent* e){
     }
 
 void CandleChart::mouseReleaseEvent(QMouseEvent* e){
+        lastModifiers_=e->modifiers();
         if(axisDragging_){axisDragging_=false;axisHover_=onPriceAxis(e->position());if(!axisHover_)unsetCursor();e->accept();refresh();return;}
         if(!dragDrawing_.isEmpty()){
-            const auto id=dragDrawing_;const auto anchor=dragAnchor_;const auto point=preview_;const bool current=gestureGeneration_==drawingFrame_.contextGeneration;
+            const auto id=dragDrawing_;const auto anchor=dragAnchor_;
+            const auto released=pointerAnchor(e->position(),plotGeometry(),e->modifiers());
+            const auto point=released?released:preview_;
+            const bool current=gestureGeneration_==drawingFrame_.contextGeneration;
             dragDrawing_.clear();dragAnchor_=-1;preview_.reset();
             if(point&&current&&drawingModel_&&!drawingModel_->locked()){QString error;if(!drawingModel_->moveAnchor(id,anchor,*point,drawingFrame_,&error))feedback(error);}
         }
@@ -632,6 +690,10 @@ void CandleChart::mouseDoubleClickEvent(QMouseEvent* e){
         if(e->button()!=Qt::LeftButton){QWidget::mouseDoubleClickEvent(e);return;}
         const auto plot=plotGeometry();
         if(onPriceAxis(e->position())){resetPriceScale();e->accept();return;}
+        if(tool_==ChartDrawingTool::Crosshair&&plot.available){
+            const auto sim=similarityTableLayout(plot);
+            if(sim.visible&&(sim.expanded?sim.box:sim.collapsedRect).contains(e->position())){e->accept();return;}
+        }
         if(tool_!=ChartDrawingTool::Crosshair||!hitDrawing(e->position(),plot).first.isEmpty()){e->accept();return;}
         // Double-click on empty chart space restores the default view at the latest bar.
         resetZoom();e->accept();
@@ -657,24 +719,57 @@ void CandleChart::contextMenuEvent(QContextMenuEvent* e){
     }
 
 void CandleChart::mouseMoveEvent(QMouseEvent* e){
-        hoverPos_=e->position();hoverInside_=true;
+        hoverPos_=e->position();hoverInside_=true;lastModifiers_=e->modifiers();
         if(axisDragging_){if(crosshairHovered)crosshairHovered(0);setPriceScale(axisPressScale_*std::exp((e->position().y()-axisPressY_)/200.0));e->accept();return;}
         {const bool axis=!dragging_&&moveDrawing_.isEmpty()&&dragDrawing_.isEmpty()&&onPriceAxis(e->position());
             if(axis!=axisHover_){axisHover_=axis;if(axis)setCursor(Qt::SizeVerCursor);else unsetCursor();}}
-        if(drawingModel_&&(!draft_.isEmpty()||!dragDrawing_.isEmpty())){if(crosshairHovered)crosshairHovered(0);preview_=pointerAnchor(e->position(),plotGeometry());refresh();e->accept();return;}
+        if(drawingModel_&&(!draft_.isEmpty()||!dragDrawing_.isEmpty())){
+            if(crosshairHovered)crosshairHovered(0);
+            const auto plot=plotGeometry();
+            preview_=pointerAnchor(e->position(),plot,e->modifiers());
+            updateMagnetSnap(plot);
+            refresh();e->accept();return;
+        }
         if(!moveDrawing_.isEmpty()){if(crosshairHovered)crosshairHovered(0);if(const auto moved=movedAnchors(e->position(),plotGeometry()))movePreview_=*moved;refresh();e->accept();return;}
-        if(dragging_){const auto plot=plotGeometry();const auto delta=(e->position().x()-dragX_)/qMax(1.0,plot.area.width())*(plot.bounds.second-plot.bounds.first);
+        const auto plot=plotGeometry();
+        updateMagnetSnap(plot);
+        bool nextSimHover=false;int nextSimRow=-1;
+        if(!dragging_&&!axisHover_&&tool_==ChartDrawingTool::Crosshair&&plot.available){
+            auto sim=similarityTableLayout(plot);
+            if(sim.visible){
+                if(sim.alwaysExpanded){
+                    if(sim.box.contains(e->position())){
+                        nextSimHover=true;
+                        for(int i=0;i<sim.rowRects.size();++i)if(sim.rowRects[i].contains(e->position())){nextSimRow=i;break;}
+                    }
+                }else{
+                    const QRectF hitRect=similarityTableHovered_?sim.box:sim.collapsedRect;
+                    if(hitRect.contains(e->position())){
+                        nextSimHover=true;
+                        if(!similarityTableHovered_){
+                            similarityTableHovered_=true;
+                            sim=similarityTableLayout(plot);
+                        }
+                        for(int i=0;i<sim.rowRects.size();++i)if(sim.rowRects[i].contains(e->position())){nextSimRow=i;break;}
+                    }
+                }
+            }
+        }
+        similarityTableHovered_=nextSimHover;similarityHoverRow_=nextSimRow;
+        if(dragging_){const auto delta=(e->position().x()-dragX_)/qMax(1.0,plot.area.width())*(plot.bounds.second-plot.bounds.first);
             if(delta){pan(delta);dragX_=e->position().x();}}
+        else if(!axisHover_&&similarityHoverRow_>=0){setCursor(Qt::PointingHandCursor);}
+        else if(!axisHover_&&similarityTableHovered_){unsetCursor();}
         else if(!axisHover_&&tool_==ChartDrawingTool::Crosshair&&drawingModel_&&drawingModel_->visible()&&!drawingModel_->locked()){
             // Show that a drawn line can be grabbed before the press; locked shapes stay arrow.
-            const auto hit=hitDrawing(e->position(),plotGeometry());
+            const auto hit=hitDrawing(e->position(),plot);
             bool movable=false;
             if(!hit.first.isEmpty())for(const auto& shape:drawingModel_->drawings())if(shape.id==hit.first){movable=!shape.locked;break;}
             if(movable)setCursor(Qt::OpenHandCursor);else unsetCursor();
         }
         else if(!axisHover_&&!dragging_&&moveDrawing_.isEmpty()&&dragDrawing_.isEmpty())unsetCursor();
         hoverY_=e->position().y();
-        const auto plot=plotGeometry();const auto& rows=plot.rows;const auto& axis=plot.axis;if(rows.isEmpty()||!axis.available){if(crosshairHovered)crosshairHovered(0);refresh();return;}
+        const auto& rows=plot.rows;const auto& axis=plot.axis;if(rows.isEmpty()||!axis.available){if(crosshairHovered)crosshairHovered(0);refresh();return;}
         const auto bounds=plot.bounds;const auto slot=bounds.first+(e->position().x()-plot.area.left())/qMax(1.0,plot.area.width())*(bounds.second-bounds.first);hover_=-1;
         double distance=.49,hoverCoordinate=std::numeric_limits<double>::quiet_NaN();
         for(qsizetype i=0;i<rows.size();++i){const auto coordinate=axis.coordinateAt(rows[i].startsAtMs);if(!coordinate)continue;
@@ -689,7 +784,7 @@ void CandleChart::mouseMoveEvent(QMouseEvent* e){
         hoverUpdate(plot.area,plot.area.left()+(hoverCoordinate-bounds.first)/(bounds.second-bounds.first)*plot.area.width());
     }
 
-void CandleChart::refresh(){geometryCache_.reset();staticDirty_=true;QWidget::update();}
+void CandleChart::refresh(){magnetGeometryDirty_=true;geometryCache_.reset();staticDirty_=true;QWidget::update();}
 
 void CandleChart::hoverUpdate(const QRectF& area,double crosshairX){
         if(staticDirty_||staticLayer_.isNull()||property("keefiNoStaticCache").toBool()){hoverRegion_={};QWidget::update();return;}
@@ -700,6 +795,15 @@ void CandleChart::hoverUpdate(const QRectF& area,double crosshairX){
         next+=QRectF(area.left(),area.top(),area.width(),CandleOhlcInset+CandleOhlcHeight+2).toAlignedRect();
         if(std::isfinite(crosshairX))next+=QRect(qFloor(crosshairX)-3,qFloor(area.top())-1,7,qCeil(area.height())+2);
         next+=QRect(qFloor(area.left())-1,qFloor(qBound(area.top(),hoverY_,area.bottom()))-3,qCeil(area.width())+2,7);
+        if(magnetSnapPos_)next+=QRect(qFloor(magnetSnapPos_->x())-12,qFloor(magnetSnapPos_->y())-12,24,24);
+        const auto plot=plotGeometry();
+        if(plot.available&&plot.following&&!studies_.similarity.paths.isEmpty()){
+            const auto sim=similarityTableLayout(plot);
+            if(sim.visible){
+                next+=(sim.expanded?sim.box:sim.collapsedRect).adjusted(-4,-4,4,4).toAlignedRect();
+                if(!sim.projectionRect.isEmpty())next+=sim.projectionRect.adjusted(-4,-4,4,4).toAlignedRect();
+            }
+        }
         const auto region=hoverRegion_.isEmpty()?QRegion(rect()):hoverRegion_+next;hoverRegion_=next;QWidget::update(region);
     }
 
@@ -720,13 +824,22 @@ void CandleChart::paintEvent(QPaintEvent* event){
     }
 
 void CandleChart::paintChart(QPainter& p,const bool S,const bool D){
-        p.setFont(KeefiFonts::font(FontRole::Caption12));if(S)p.fillRect(rect(),themeColors().bg);const auto plot=plotGeometry();if(!plot.available)return;
+        p.setFont(KeefiFonts::font(FontRole::Caption12));if(S)p.fillRect(rect(),themeColors().bg);const auto plot=plotGeometry();
+        if(D&&magnetGeometryDirty_)updateMagnetSnap(plot);
+        if(!plot.available)return;
         if(plot.rows.isEmpty()){
             offscreenTopTag_.reset();offscreenBottomTag_.reset();
             fibAxisLabels_.clear();
             setProperty("drawingLabelTexts",QStringList{});
             setProperty("drawingOffscreenTopLabel",QString{});
             setProperty("drawingOffscreenBottomLabel",QString{});
+            setProperty("similarityTableVisible",false);
+            setProperty("similarityTableExpanded",false);
+            setProperty("similarityTableRect",QRectF{});
+            setProperty("similarityTableSummary",QString{});
+            setProperty("similarityTableRows",QStringList{});
+            setProperty("similarityRowRects",QVariantList{});
+            setProperty("similarityHoverRow",-1);
             if(S){p.setPen(themeColors().text3);p.drawText(rect(),Qt::AlignCenter,tr("이 구간에 관측된 봉이 없어요\n가로로 계속 이동할 수 있어요"));}return;
         }
         const auto& rows=plot.rows;const auto& axis=plot.axis;const auto& area=plot.area;const auto bounds=plot.bounds;
@@ -865,12 +978,15 @@ void CandleChart::paintChart(QPainter& p,const bool S,const bool D){
             QPainterPath mean;bool first=true;for(const auto& point:similar.mean){if(first){mean.moveTo(x(point.atMs),y(point.price));first=false;}else mean.lineTo(x(point.atMs),y(point.price));}
             p.setPen(QPen(studyInk("similarity"),2));p.drawPath(mean);
             // The following coordinates contain actual historical paths, not
-            // a forecast. Keep that meaning visible beside the projection.
-            p.setFont(KeefiFonts::font(FontRole::Caption12));p.setPen(themeColors().text2);
-            const auto note=tr("과거 경로 · 예측 아님");const auto noteWidth=p.fontMetrics().horizontalAdvance(note);
-            const auto left=qBound(area.left(),x(similar.maximum.first().atMs)+6,qMax(area.left(),area.right()-noteWidth-4));
-            const QRectF noteBox(left,area.top()+4,qMin(qreal(noteWidth+4),area.right()-left),20);
-            p.fillRect(noteBox,themeColors().bg);p.drawText(noteBox,Qt::AlignLeft|Qt::AlignVCenter,note);
+            // a forecast. When paths exist, the similarity comparison table in D pass
+            // carries the single disclaimer line so it never duplicates.
+            if(similar.paths.isEmpty()){
+                p.setFont(KeefiFonts::font(FontRole::Caption12));p.setPen(themeColors().text2);
+                const auto note=tr("과거 경로 · 예측 아님");const auto noteWidth=p.fontMetrics().horizontalAdvance(note);
+                const auto left=qBound(area.left(),x(similar.maximum.first().atMs)+6,qMax(area.left(),area.right()-noteWidth-4));
+                const QRectF noteBox(left,area.top()+4,qMin(qreal(noteWidth+4),area.right()-left),20);
+                p.fillRect(noteBox,themeColors().bg);p.drawText(noteBox,Qt::AlignLeft|Qt::AlignVCenter,note);
+            }
         }
         if(layers_.contains("levels")&&levels_.state.available){
             const QColor ink=studyInk("levels");QList<qreal> labels;
@@ -902,7 +1018,7 @@ void CandleChart::paintChart(QPainter& p,const bool S,const bool D){
         if(latest){const auto close=latest->close.toDouble(),open=latest->open.toDouble();latestColor=MovementColorPolicy::fillFor(this,movementForSign(close>open?1:close<open?-1:0));
             // Lighter than the candle ink so the line never reads as a candle body.
             if(close>=low&&close<=high){latestY=y(close);if(S){auto line=latestColor;line.setAlphaF(.7);p.setPen(QPen(line,1,Qt::DashLine));p.drawLine(QPointF(area.left(),latestY),QPointF(area.right(),latestY));}}}
-        if(D){paintAutoPreview(p,plot);paintLiveTrade(p,plot);}
+        if(D){paintAutoPreview(p,plot);paintLiveTrade(p,plot);paintSimilarityOverlay(p,plot);paintMagnetSnapRing(p);}
         const bool pointerInPlot=hoverInside_&&area.contains(hoverPos_)&&moveDrawing_.isEmpty()&&!dragging_;
         if(D&&hover_>=0&&hover_<rows.size()){p.setPen(QPen(themeColors().text3,1,Qt::DashLine));const auto xx=x(rows[hover_].startsAtMs);p.drawLine(QPointF(xx,area.top()),QPointF(xx,area.bottom()));
             const auto yy=qBound(area.top(),hoverY_,area.bottom());p.drawLine(QPointF(area.left(),yy),QPointF(area.right(),yy));}
@@ -1097,12 +1213,317 @@ std::optional<QPointF> CandleChart::drawingPosition(const ChartDrawingPoint& poi
             plot.area.bottom()-(price-plot.low)/(plot.high-plot.low)*plot.area.height());
     }
 
-std::optional<ChartDrawingPoint> CandleChart::pointerAnchor(const QPointF& pos,const Geometry& plot)const{
+QPolygonF CandleChart::autoTrendPixels(const QList<ChartDrawingPoint>& anchors,const Geometry& plot)const{
+        QPolygonF pixels;
+        const auto path=AutoChartGeometry::trendDisplayPath(anchors,drawingFrame_,plot.axis);
+        for(const QPointF& point:path){
+            const auto x=plot.area.left()+(point.x()-plot.bounds.first)/(plot.bounds.second-plot.bounds.first)*plot.area.width();
+            pixels.append({x,priceToY(point.y(),plot.low,plot.high,plot.area)});
+        }
+        return pixels;
+    }
+
+bool CandleChart::strongMagnetActive(Qt::KeyboardModifiers eventModifiers){
+        const auto mods=eventModifiers|QGuiApplication::queryKeyboardModifiers();
+        return mods.testFlag(Qt::ControlModifier);
+    }
+
+void CandleChart::updateMagnetSnap(const Geometry& plot){
+        magnetGeometryDirty_=false;
+        magnetSnapPos_.reset();magnetSnapField_.clear();magnetSnapPrice_.clear();
+        const bool strong=strongMagnetActive(lastModifiers_);
+        magnetStrongActive_=strong;
+        const bool active=hoverInside_&&!dragging_&&!axisDragging_&&moveDrawing_.isEmpty()&&plot.available&&plot.area.contains(hoverPos_)&&
+            drawingModel_&&drawingModel_->visible()&&!drawingModel_->locked()&&
+            (strong||(drawingModel_->magnetEnabled()&&(tool_!=ChartDrawingTool::Crosshair||!dragDrawing_.isEmpty())));
+        if(active){
+            ChartDrawingSnap snap;
+            const auto anchor=pointerAnchor(hoverPos_,plot,lastModifiers_,&snap);
+            if(anchor&&snap.available&&snap.snapped){
+                if(const auto pos=drawingPosition(snap.point,plot)){
+                    magnetSnapPos_=pos;
+                    magnetSnapField_=snap.field;
+                    magnetSnapPrice_=snap.point.price;
+                }
+            }
+        }
+        setProperty("magnetSnapActive",magnetSnapPos_.has_value());
+        setProperty("magnetStrongActive",strong);
+        setProperty("magnetSnapField",magnetSnapField_);
+        setProperty("magnetSnapPrice",magnetSnapPrice_);
+        setProperty("magnetSnapPos",magnetSnapPos_.value_or(QPointF{}));
+    }
+
+void CandleChart::paintMagnetSnapRing(QPainter& painter)const{
+        if(!magnetSnapPos_)return;
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing,true);
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(themeColors().bg,2.0));
+        painter.drawEllipse(*magnetSnapPos_,7.0,7.0);
+        painter.setPen(QPen(themeColors().accent,2.0));
+        painter.drawEllipse(*magnetSnapPos_,6.0,6.0);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(themeColors().accent);
+        painter.drawEllipse(*magnetSnapPos_,2.2,2.2);
+        painter.restore();
+    }
+
+CandleChart::SimilarityTableLayout CandleChart::similarityTableLayout(const Geometry& plot)const{
+        SimilarityTableLayout out;
+        if(!plot.available||!plot.following||studies_.similarity.paths.isEmpty()||plot.area.width()<140.0||plot.area.height()<80.0)return out;
+        const auto& similar=studies_.similarity;
+        const QFont captionFont=KeefiFonts::font(FontRole::Caption12);
+        const QFont numFont=KeefiFonts::font(FontRole::Number11);
+        const QFontMetricsF captionFm(captionFont),numFm(numFont);
+        const auto formatSignedPct=[](double pct){
+            if(!std::isfinite(pct))return QStringLiteral("-");
+            if(std::abs(pct)<0.05)return QStringLiteral("0.0%");
+            return (pct>0.0?QStringLiteral("+"):QString{})+QString::number(pct,'f',1)+QStringLiteral("%");
+        };
+        const QTimeZone kst("Asia/Seoul");
+        double maxAfterW=captionFm.horizontalAdvance(tr("이후 20봉"));
+        double sumPct=0.0;int pctCount=0;
+        for(int i=0;i<similar.paths.size();++i){
+            const auto& path=similar.paths[i];
+            SimilarityTableLayout::Row row;
+            row.rank=QString::number(i+1);
+            row.endText=QDateTime::fromMSecsSinceEpoch(path.toMs,kst).toString(QStringLiteral("yy.MM.dd HH:mm"));
+            row.corrText=QString::number(path.correlation,'f',2);
+            if(path.points.size()>=2&&path.points.first().price>0.0){
+                const double pct=(path.points.last().price/path.points.first().price-1.0)*100.0;
+                row.afterText=formatSignedPct(pct);
+                row.direction=pct>0.05?1:pct<-0.05?-1:0;
+                sumPct+=pct;++pctCount;
+            }else{
+                row.afterText=QStringLiteral("-");
+            }
+            maxAfterW=qMax(maxAfterW,numFm.horizontalAdvance(row.afterText));
+            out.rows.append(row);
+        }
+        const double meanPct=pctCount>0?(sumPct/pctCount):0.0;
+        out.title=tr("닮은꼴 · 과거 비교");
+        out.disclaimer=tr("과거 경로 · 예측 아님");
+        out.summary=tr("닮은꼴 %1 · 이후 20봉 평균 %2").arg(similar.paths.size()).arg(formatSignedPct(meanPct));
+
+        const double col0=qMax(captionFm.horizontalAdvance(QStringLiteral("#")),numFm.horizontalAdvance(QString::number(similar.paths.size())))+8.0;
+        const double col1=qMax(captionFm.horizontalAdvance(tr("구간 끝")),numFm.horizontalAdvance(QStringLiteral("88.88.88 88:88")))+8.0;
+        const double col2=qMax(captionFm.horizontalAdvance(tr("닮음")),numFm.horizontalAdvance(QStringLiteral("0.99")))+8.0;
+        const double col3=maxAfterW+8.0;
+        out.colWidths={col0,col1,col2,col3};
+        const double padX=6.0,padY=6.0,titleH=18.0,headerH=18.0,rowH=22.0,footH=16.0;
+        const double expandedW=qMin(plot.area.width()-8.0,padX*2.0+col0+col1+col2+col3);
+        const double expandedH=padY*2.0+titleH+headerH+rowH*out.rows.size()+footH;
+
+        const qint64 lastActualAt=forming_?forming_->startsAtMs:(rows_.isEmpty()?qint64(0):rows_.last().startsAtMs);
+        const auto lastSlot=plot.axis.coordinateAt(lastActualAt);
+        const double bodyWidth=qBound(1.0,plot.area.width()/(plot.bounds.second-plot.bounds.first)*.65,18.0);
+        const double lastCandleRight=lastSlot
+            ?(plot.area.left()+(*lastSlot-plot.bounds.first)/(plot.bounds.second-plot.bounds.first)*plot.area.width()+bodyWidth/2.0+6.0)
+            :plot.area.left();
+        const double projRight=plot.area.right()-4.0;
+        const double projAvailW=projRight-lastCandleRight;
+        out.projectionRect=QRectF(qBound(plot.area.left(),lastCandleRight-6.0,plot.area.right()),plot.area.top(),
+            qMax(0.0,plot.area.right()-qBound(plot.area.left(),lastCandleRight-6.0,plot.area.right())),plot.area.height());
+
+        const bool fitsProjection=(projAvailW>=expandedW)&&(plot.area.height()>=expandedH+8.0);
+        out.alwaysExpanded=fitsProjection;
+        out.expanded=fitsProjection||similarityTableHovered_;
+
+        const double pillW=qMin(plot.area.width()-8.0,qMax(captionFm.horizontalAdvance(out.summary),captionFm.horizontalAdvance(out.disclaimer))+16.0);
+        const double pillH=38.0;
+        const double desiredLeft=out.expanded?qMax(plot.area.left()+4.0,projRight-expandedW):qMax(plot.area.left()+4.0,projRight-pillW);
+        const bool clearsLegend=(desiredLeft>=plot.area.left()+340.0);
+        const double top=(!clearsLegend&&plot.area.height()>=(out.expanded?expandedH:pillH)+CandleOhlcInset+CandleOhlcHeight+12.0)
+            ?(plot.area.top()+CandleOhlcInset+CandleOhlcHeight+6.0)
+            :(plot.area.top()+4.0);
+        out.collapsedRect=QRectF(qMax(plot.area.left()+4.0,projRight-pillW),top,pillW,pillH);
+        out.box=QRectF(qMax(plot.area.left()+4.0,projRight-expandedW),top,expandedW,qMin(expandedH,plot.area.bottom()-top-4.0));
+        double yCur=out.box.top()+padY+titleH+headerH;
+        for(int i=0;i<out.rows.size();++i){
+            out.rowRects.append(QRectF(out.box.left()+2.0,yCur,out.box.width()-4.0,rowH));
+            yCur+=rowH;
+        }
+        out.visible=true;
+        return out;
+    }
+
+void CandleChart::paintSimilarityOverlay(QPainter& painter,const Geometry& plot){
+        const auto clearProps=[&]{
+            similarityTableHovered_=false;similarityHoverRow_=-1;
+            setProperty("similarityTableVisible",false);
+            setProperty("similarityTableExpanded",false);
+            setProperty("similarityTableRect",QRectF{});
+            setProperty("similarityTableSummary",QString{});
+            setProperty("similarityTableRows",QStringList{});
+            setProperty("similarityRowRects",QVariantList{});
+            setProperty("similarityHoverRow",-1);
+            setProperty("similarityTitle",QString{});
+            setProperty("similarityDisclaimer",QString{});
+        };
+        const auto sim=similarityTableLayout(plot);
+        if(!sim.visible){clearProps();return;}
+
+        const QList<QColor> pathColors{themeColors().studyPurple,themeColors().studyBlue,themeColors().studyOrange};
+        const auto& similar=studies_.similarity;
+        const auto x=[&](qint64 at){
+            const auto slot=plot.axis.coordinateAt(at);
+            return slot?plot.area.left()+(*slot-plot.bounds.first)/(plot.bounds.second-plot.bounds.first)*plot.area.width():std::numeric_limits<double>::quiet_NaN();
+        };
+        const auto y=[&](double value){return plot.area.bottom()-(value-plot.low)/(plot.high-plot.low)*plot.area.height();};
+
+        // Highlight the hovered historical path in D pass so hovering a table row immediately emphasizes its trajectory.
+        if(similarityHoverRow_>=0&&similarityHoverRow_<similar.paths.size()){
+            const auto& path=similar.paths[similarityHoverRow_];
+            const QColor ink=pathColors[similarityHoverRow_%pathColors.size()];
+            QPainterPath curve;bool first=true;QPointF lastPt;
+            for(const auto& pt:path.points){
+                const double xx=x(pt.atMs),yy=y(pt.price);
+                if(!std::isfinite(xx)||!std::isfinite(yy))continue;
+                lastPt=QPointF(xx,yy);
+                if(first){curve.moveTo(lastPt);first=false;}else curve.lineTo(lastPt);
+            }
+            if(!first){
+                painter.save();
+                painter.setRenderHint(QPainter::Antialiasing,true);
+                painter.setBrush(Qt::NoBrush);
+                painter.setPen(QPen(ink,2.4,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
+                painter.drawPath(curve);
+                painter.setBrush(ink);
+                painter.setPen(QPen(themeColors().bg,1.2));
+                painter.drawEllipse(lastPt,3.2,3.2);
+                painter.restore();
+            }
+        }
+
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing,true);
+        const QFont captionFont=KeefiFonts::font(FontRole::Caption12);
+        const QFont numFont=KeefiFonts::font(FontRole::Number11);
+        QColor cardBg=themeColors().bg;cardBg.setAlphaF(.94);
+        painter.setBrush(cardBg);
+        painter.setPen(QPen(themeColors().rule,1.0));
+
+        const QRectF activeRect=sim.expanded?sim.box:sim.collapsedRect;
+        painter.drawRoundedRect(activeRect,4.0,4.0);
+
+        if(!sim.expanded){
+            painter.setFont(captionFont);
+            painter.setPen(themeColors().text);
+            painter.drawText(QRectF(sim.collapsedRect.left()+8.0,sim.collapsedRect.top()+3.0,sim.collapsedRect.width()-16.0,16.0),Qt::AlignLeft|Qt::AlignVCenter,sim.summary);
+            painter.setPen(themeColors().text2);
+            painter.drawText(QRectF(sim.collapsedRect.left()+8.0,sim.collapsedRect.top()+19.0,sim.collapsedRect.width()-16.0,16.0),Qt::AlignLeft|Qt::AlignVCenter,sim.disclaimer);
+        }else{
+            const double left=sim.box.left()+6.0,right=sim.box.right()-6.0;
+            const double w0=sim.colWidths[0],w1=sim.colWidths[1],w2=sim.colWidths[2],w3=qMax(24.0,right-left-w0-w1-w2);
+            double yy=sim.box.top()+6.0;
+            painter.setFont(captionFont);
+            painter.setPen(themeColors().text);
+            painter.drawText(QRectF(left,yy,right-left,18.0),Qt::AlignLeft|Qt::AlignVCenter,sim.title);
+            yy+=18.0;
+
+            painter.setPen(themeColors().text2);
+            painter.drawText(QRectF(left,yy,w0,18.0),Qt::AlignLeft|Qt::AlignVCenter,QStringLiteral("#"));
+            painter.drawText(QRectF(left+w0,yy,w1,18.0),Qt::AlignLeft|Qt::AlignVCenter,tr("구간 끝"));
+            painter.drawText(QRectF(left+w0+w1,yy,w2,18.0),Qt::AlignRight|Qt::AlignVCenter,tr("닮음"));
+            painter.drawText(QRectF(left+w0+w1+w2,yy,w3,18.0),Qt::AlignRight|Qt::AlignVCenter,tr("이후 20봉"));
+            painter.setPen(QPen(themeColors().rule,1.0));
+            painter.drawLine(QPointF(left,yy+17.5),QPointF(right,yy+17.5));
+            yy+=18.0;
+
+            for(int i=0;i<sim.rows.size()&&i<sim.rowRects.size();++i){
+                const auto& row=sim.rows[i];
+                const auto& r=sim.rowRects[i];
+                const QColor swatch=pathColors[i%pathColors.size()];
+                if(i==similarityHoverRow_){
+                    painter.setPen(Qt::NoPen);
+                    painter.setBrush(themeColors().surface);
+                    painter.drawRoundedRect(r.adjusted(2.0,1.0,-2.0,-1.0),3.0,3.0);
+                    painter.setBrush(swatch);
+                    painter.drawRect(QRectF(r.left()+2.0,r.top()+3.0,2.5,r.height()-6.0));
+                }
+                painter.setFont(numFont);
+                painter.setPen(swatch);
+                painter.drawText(QRectF(left,r.top(),w0,r.height()),Qt::AlignLeft|Qt::AlignVCenter,row.rank);
+                painter.setPen(themeColors().text);
+                painter.drawText(QRectF(left+w0,r.top(),w1,r.height()),Qt::AlignLeft|Qt::AlignVCenter,row.endText);
+                painter.setPen(themeColors().text2);
+                painter.drawText(QRectF(left+w0+w1,r.top(),w2,r.height()),Qt::AlignRight|Qt::AlignVCenter,row.corrText);
+                painter.setPen(row.direction==0?themeColors().text2:MovementColorPolicy::colorFor(this,movementForSign(row.direction)));
+                painter.drawText(QRectF(left+w0+w1+w2,r.top(),w3,r.height()),Qt::AlignRight|Qt::AlignVCenter,row.afterText);
+                yy=r.bottom();
+            }
+            painter.setFont(captionFont);
+            painter.setPen(themeColors().text2);
+            painter.drawText(QRectF(left,yy,right-left,16.0),Qt::AlignLeft|Qt::AlignVCenter,sim.disclaimer);
+        }
+        painter.restore();
+
+        QStringList rowTexts;QVariantList rowRects;
+        for(int i=0;i<sim.rows.size();++i){
+            const auto& r=sim.rows[i];
+            rowTexts.append(QStringLiteral("%1|%2|%3|%4").arg(r.rank,r.endText,r.corrText,r.afterText));
+            if(i<sim.rowRects.size())rowRects.append(sim.rowRects[i]);
+        }
+        setProperty("similarityTableVisible",true);
+        setProperty("similarityTableExpanded",sim.expanded);
+        setProperty("similarityTableRect",activeRect);
+        setProperty("similarityTableSummary",sim.summary);
+        setProperty("similarityTableRows",rowTexts);
+        setProperty("similarityRowRects",rowRects);
+        setProperty("similarityHoverRow",similarityHoverRow_);
+        setProperty("similarityTitle",sim.title);
+        setProperty("similarityDisclaimer",sim.disclaimer);
+    }
+
+std::optional<ChartDrawingPoint> CandleChart::pointerAnchor(const QPointF& pos,const Geometry& plot,Qt::KeyboardModifiers modifiers,ChartDrawingSnap* snapOut)const{
         if(!plot.available||!plot.area.contains(pos)||!drawingModel_||drawingModel_->locked()||drawingFrame_.contextGeneration!=drawingModel_->contextGeneration())return {};
         const auto slot=plot.bounds.first+(pos.x()-plot.area.left())/plot.area.width()*(plot.bounds.second-plot.bounds.first);
-        const auto observed=plot.axis.observedTimeAt(slot);if(!observed||!ChartDrawings::readOhlc(drawingFrame_,*observed))return {};
-        ChartDrawingPoint point{*observed,pixelPrice(plot.high-(pos.y()-plot.area.top())/plot.area.height()*(plot.high-plot.low),(plot.high-plot.low)/plot.area.height())};if(point.price.isEmpty())return {};
-        if(drawingModel_->magnetEnabled()){const auto snap=ChartDrawings::snapOhlc(drawingFrame_,point,plot.area.height()/(plot.high-plot.low));if(snap.available&&snap.snapped)point=snap.point;}
+        const auto observed=plot.axis.observedTimeAt(slot);
+        const bool strong=strongMagnetActive(modifiers);
+        if(strong){
+            // Compare actual OHLC pixel positions, including neighbouring observed candles
+            // when the plot is zoomed out. Preserve the source's exact decimal on selection.
+            if(!validSnapFrame_)validSnapFrame_=ChartDrawings::validFrame(drawingFrame_);
+            if(!*validSnapFrame_)return {};
+            double best=StrongMagnetRadiusPx+1e-8;
+            ChartDrawingSnap closest;
+            const double slotWidth=plot.area.width()/(plot.bounds.second-plot.bounds.first);
+            const double reach=StrongMagnetRadiusPx/slotWidth;
+            const auto& bars=drawingFrame_.bars;
+            const auto first=std::lower_bound(bars.cbegin(),bars.cend(),slot-reach-1e-8,
+                [&](const auto& bar,double edge){return plot.axis.coordinateAt(bar.candle.startsAtMs).value_or(-std::numeric_limits<double>::infinity())<edge;});
+            for(auto it=first;it!=bars.cend();++it){
+                const auto& c=it->candle;
+                const auto column=plot.axis.coordinateAt(c.startsAtMs);
+                if(!column)continue;
+                if(*column>slot+reach+1e-8)break;
+                const double dx=(*column-slot)*slotWidth;
+                for(const auto& [field,raw]:{qMakePair("close",c.close),qMakePair("open",c.open),
+                                             qMakePair("high",c.high),qMakePair("low",c.low)}){
+                    const double dy=priceToY(raw.toDouble(),plot.low,plot.high,plot.area)-pos.y();
+                    const double distance=std::hypot(dx,dy);
+                    if(distance<best){
+                        best=distance;
+                        closest.available=closest.snapped=true;
+                        closest.field=QString::fromLatin1(field);
+                        closest.point={c.startsAtMs,raw};
+                    }
+                }
+            }
+            if(closest.snapped){
+                if(snapOut)*snapOut=closest;
+                return closest.point;
+            }
+        }
+        if(!observed||!ChartDrawings::readOhlc(drawingFrame_,*observed))return {};
+        ChartDrawingPoint point{*observed,pixelPrice(plot.high-(pos.y()-plot.area.top())/plot.area.height()*(plot.high-plot.low),(plot.high-plot.low)/plot.area.height())};
+        if(point.price.isEmpty())return {};
+        if(!strong&&drawingModel_->magnetEnabled()){
+            const auto snap=ChartDrawings::snapOhlc(drawingFrame_,point,plot.area.height()/(plot.high-plot.low),DefaultMagnetRadiusPx);
+            if(snapOut)*snapOut=snap;
+            if(snap.available&&snap.snapped)point=snap.point;
+        }
         return point;
     }
 
@@ -1134,8 +1555,14 @@ QPair<QString,int> CandleChart::hitDrawing(const QPointF& pos,const Geometry& pl
             }
             if(shape.anchors.size()!=2)continue;const auto a=drawingPosition(shape.anchors[0],plot),b=drawingPosition(shape.anchors[1],plot);if(!a||!b)continue;
             if(shape.id==selectedDrawing_){if(QLineF(pos,*a).length()<=9)return {shape.id,0};if(QLineF(pos,*b).length()<=9)return {shape.id,1};}
-            const auto ab=*b-*a;const double length=ab.x()*ab.x()+ab.y()*ab.y();const auto fraction=length>0?qBound(0.0,((pos-*a).x()*ab.x()+(pos-*a).y()*ab.y())/length,1.0):0;
-            if(QLineF(pos,*a+ab*fraction).length()<=7)return {shape.id,-1};
+            const QPolygonF path=shape.kind==ChartDrawingKind::Trend&&!shape.autoBatchId.isEmpty()
+                ?autoTrendPixels(shape.anchors,plot):QPolygonF{*a,*b};
+            for(qsizetype j=1;j<path.size();++j){
+                const auto start=path[j-1],delta=path[j]-start;
+                const double lengthSquared=QPointF::dotProduct(delta,delta);
+                const double t=lengthSquared>0?qBound(0.0,QPointF::dotProduct(pos-start,delta)/lengthSquared,1.0):0;
+                if(QLineF(pos,start+delta*t).length()<=7)return {shape.id,-1};
+            }
         }
         return {};
     }
@@ -1192,7 +1619,10 @@ void CandleChart::paintDrawings(QPainter& painter,const Geometry& plot){
                 painter.save();painter.setFont(KeefiFonts::font(FontRole::Number11));
                 painter.drawText(QRectF(plot.area.left()+6,yy-20,plot.area.width()-12,18),Qt::AlignLeft,priceAmount(shape.anchors.first().price)+" "+currency_);painter.restore();
             }else if(shape.anchors.size()==2){
-                const auto a=drawingPosition(shape.anchors[0],plot),b=drawingPosition(shape.anchors[1],plot);if(!a||!b)return;painter.drawLine(*a,*b);
+                const auto a=drawingPosition(shape.anchors[0],plot),b=drawingPosition(shape.anchors[1],plot);if(!a||!b)return;
+                if(shape.kind==ChartDrawingKind::Trend&&!shape.autoBatchId.isEmpty())
+                    painter.drawPolyline(autoTrendPixels(shape.anchors,plot));
+                else painter.drawLine(*a,*b);
                 if(shape.kind==ChartDrawingKind::Measure){const auto measure=ChartDrawings::measure(shape.anchors,drawingFrame_);QString text;
                     if(measure.returnPercent)text=QString::number(*measure.returnPercent,'f',2)+"%";
                     text+=measure.barIntervals?tr(" · %1봉 간격").arg(*measure.barIntervals):tr(" · 봉 간격 미확인");
@@ -1319,20 +1749,26 @@ void CandleChart::paintAutoPreview(QPainter& painter,const Geometry& plot)const{
             }else if(c.kind==ChartDrawingKind::Trend&&c.anchors.size()==2){
                 const auto a=drawingPosition(c.anchors[0],plot),b=drawingPosition(c.anchors[1],plot);if(!a||!b)continue;
                 painter.setPen(QPen(themeColors().studyBlue,1.5,Qt::SolidLine));
-                painter.drawLine(*a,*a+(*b-*a)*progress);
+                const auto path=autoTrendPixels(c.anchors,plot);
+                if(path.isEmpty())continue;
+                painter.save();
+                if(progress<1.0&&a->x()!=b->x()){
+                    const auto limit=a->x()+(b->x()-a->x())*progress;
+                    painter.setClipRect(QRectF(qMin(a->x(),limit),plot.area.top(),std::abs(limit-a->x()),plot.area.height()),Qt::IntersectClip);
+                }
+                painter.drawPolyline(path);
+                painter.restore();
                 if(progress>=1.0){
                     if(c.touches>0)
                         paintTextBadge(painter,QPointF(b->x(),b->y()-4.0),tr("%1번 닿음").arg(c.touches),themeColors().text2,themeColors().bg,plot.area,true);
-                    const double dx=b->x()-a->x(),dy=b->y()-a->y();
                     for(const qint64 sweepAt:c.sweepAtMs){
                         const auto slot=plot.axis.coordinateAt(sweepAt);if(!slot)continue;
                         const double sx=plot.area.left()+(*slot-plot.bounds.first)/(plot.bounds.second-plot.bounds.first)*plot.area.width();
                         const MarketCandle* match=nullptr;for(const auto& row:plot.rows)if(row.startsAtMs==sweepAt){match=&row;break;}
                         if(!match)continue;
-                        const double lineY=std::abs(dx)>1e-6?a->y()+(sx-a->x())/dx*dy:a->y();
                         const double lowY=priceToY(match->low.toDouble(),plot.low,plot.high,plot.area);
                         const double highY=priceToY(match->high.toDouble(),plot.low,plot.high,plot.area);
-                        const bool lowerSweep=lowY>lineY&&std::abs(lowY-lineY)>=std::abs(lineY-highY);
+                        const bool lowerSweep=!c.trendHighSide;
                         const double tipY=lowerSweep?qMin(plot.area.bottom()-2.0,lowY+3.0):qMax(plot.area.top()+2.0,highY-3.0);
                         const double dir=lowerSweep?1.0:-1.0;
                         painter.setPen(QPen(themeColors().accent,1.5));

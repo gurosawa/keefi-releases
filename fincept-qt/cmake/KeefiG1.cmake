@@ -155,6 +155,7 @@ target_sources(keefi_trading PRIVATE src/keefi/ExtendedChartStudies.cpp src/keef
 target_sources(keefi_trading PRIVATE src/keefi/ChartPublicContextSource.cpp src/keefi/ChartPublicContextRequests.cpp src/keefi/ChartPublicContextSource.h)
 target_sources(keefi_trading PRIVATE src/keefi/CoinFlowStudyRunner.cpp src/keefi/CoinFlowStudyRunner.h)
 target_sources(keefi_trading PRIVATE src/keefi/ChartDrawings.cpp src/keefi/ChartDrawings.h
+    src/keefi/ChartTimeAxis.cpp src/keefi/ChartTimeAxis.h
     src/keefi/AutoChartGeometry.cpp src/keefi/AutoChartGeometry.h
     src/keefi/CoinFlowStudies.cpp src/keefi/CoinFlowStudies.h
     src/keefi/CoinFlowProtocol.cpp src/keefi/CoinFlowProtocol.h
@@ -236,12 +237,13 @@ target_sources(keefi_ui PRIVATE
     src/keefi/ChartWorkspaceBrowser.cpp
     src/keefi/ChartWorkspaceWatchlists.cpp
     src/keefi/ChartWorkspacePresentation.cpp src/keefi/ChartWorkspacePresentation_p.h)
+# v6.1 Step 2-6/2-7: interval pins, right panel, trade tape, shared splitter share.
+target_sources(keefi_ui PRIVATE src/keefi/ChartTimeframePins.cpp src/keefi/ChartTimeframePins.h src/keefi/ChartWorkspaceTimeframes.cpp src/keefi/ChartWorkspaceSidePanel.cpp src/keefi/CoinTapeView.cpp src/keefi/CoinTapeView.h src/keefi/SplitterShare.cpp src/keefi/SplitterShare.h)
 target_sources(keefi_ui PRIVATE src/keefi/InstrumentListTree.cpp src/keefi/InstrumentListTree.h src/keefi/InstrumentListSelector.cpp src/keefi/InstrumentListSelector.h src/keefi/ChartWatchlistInteractions.cpp)
 target_link_libraries(keefi_ui PUBLIC keefi_vault keefi_trading Qt6::Widgets)
 target_sources(keefi_ui PRIVATE src/keefi/ChartAlertsPanel.cpp src/keefi/ChartAlertsPanel.h)
 target_sources(keefi_ui PRIVATE src/keefi/MarketCompareView.cpp src/keefi/MarketCompareView.h)
 target_sources(keefi_ui PRIVATE src/keefi/BackgroundTray.cpp src/keefi/BackgroundTray.h)
-target_sources(keefi_ui PRIVATE src/keefi/ChartTimeAxis.cpp src/keefi/ChartTimeAxis.h)
 target_include_directories(keefi_ui PUBLIC src)
 
 # Headless public-market collector (COLLECTOR-COMPARE-RULES-2026-11-06.md). Not bundled into the app.

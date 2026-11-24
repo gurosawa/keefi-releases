@@ -231,4 +231,10 @@ CoinFlowStudySet coinFlowStudies(const CoinFlowSnapshot&, qint64 asOfMs);
 // Opt-in evidence for N15. The ordinary calculator does not collect the extra
 // five-minute joins while the strong-reversal indicator is off.
 CoinFlowStudySet coinFlowStudiesWithReversalEvidence(const CoinFlowSnapshot&, qint64 asOfMs);
+// The CoinLargeTradeStudy rule for one trade window, without the rest of the
+// study set: trades from candidateFromMs whose exact quote notional ranks in
+// the top 1% of the 200 previous same-epoch trades, under continuous observed
+// coverage. The same calculation as the whale study's candidates; no amount
+// threshold of its own. Pure: explicit asOf, no clock/network/settings.
+QList<CoinLargeTradePoint> coinLargeTrades(const CoinFlowWindow&, qint64 asOfMs, qint64 candidateFromMs = 0);
 } // namespace keefi

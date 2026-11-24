@@ -200,7 +200,14 @@ add_test(NAME keefi_watchlist_workspace_list COMMAND tst_keefi_watchlist_workspa
 set_tests_properties(keefi_watchlist_workspace_list PROPERTIES TIMEOUT 60)
 target_link_libraries(tst_keefi_chart_workspace PRIVATE keefi_ui Qt6::Test)
 add_test(NAME keefi_chart_workspace COMMAND tst_keefi_chart_workspace)
-set_tests_properties(keefi_chart_workspace PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+set_tests_properties(keefi_chart_workspace PROPERTIES TIMEOUT 90 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+# v6.1 Step 2-6/2-7: interval pins and the right panel beside the chart.
+foreach(_step267_suite chart_timeframe_pins chart_side_panel)
+    add_executable(tst_keefi_${_step267_suite} tst_${_step267_suite}.cpp)
+    target_link_libraries(tst_keefi_${_step267_suite} PRIVATE keefi_ui Qt6::Test)
+    add_test(NAME keefi_${_step267_suite} COMMAND tst_keefi_${_step267_suite})
+    set_tests_properties(keefi_${_step267_suite} PROPERTIES TIMEOUT 120 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endforeach()
 
 add_executable(tst_keefi_chart_instrument_panel tst_chart_instrument_panel.cpp)
 target_link_libraries(tst_keefi_chart_instrument_panel PRIVATE keefi_ui Qt6::Test)

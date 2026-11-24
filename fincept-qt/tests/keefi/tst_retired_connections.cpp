@@ -77,7 +77,7 @@ class RetiredConnectionTests final : public QObject {
 private slots:
     void existingLiveBrokersNeverReadOrReauthenticate() {
         QTemporaryDir dir;
-        Vault vault(dir.filePath("credentials.keefi-vault"));
+        Vault vault(dir.filePath("profile/credentials.keefi-vault"));
         QVERIFY(test::openSuspendedBrokerFixture(vault));
         QCOMPARE(vault.accounts().size(), 2);
         RecordingTransport transport;
@@ -140,7 +140,7 @@ private slots:
     void legacyConnectionsCannotBeSelectedOrSendRequests() {
         QFETCH(QString, provider); QFETCH(QString, market); QFETCH(QString, environment);
         QTemporaryDir dir;
-        const auto path = dir.filePath("synthetic-legacy.bin");
+        const auto path = dir.filePath("profile/synthetic-legacy.bin");
         Vault vault(path);
         AccountRecord account;
         account.provider = provider; account.alias = "가짜 은퇴 연결";

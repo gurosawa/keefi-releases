@@ -185,7 +185,10 @@ def build_package(args):
         app = work / "KEEFI"
         app.mkdir()
         shutil.copy2(binary, app)
+        # The QWidget chart uses the raster paint engine. Optional shader compiler
+        # and software OpenGL packages are unrelated to this build's runtime.
         subprocess.run([qt / "bin/windeployqt.exe", "--release", "--no-translations", "--compiler-runtime",
+                        "--no-system-d3d-compiler", "--no-system-dxc-compiler", "--no-opengl-sw",
                         app / binary.name], env=env, check=True)
         # Keep all plugins beside the portable binary, including the built-in Windows TLS backend.
         (app / "qt.conf").write_text("[Paths]\nPrefix=.\nPlugins=.\n", encoding="ascii")

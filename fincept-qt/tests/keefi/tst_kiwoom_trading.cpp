@@ -61,7 +61,7 @@ public:
 };
 struct Context {
     QTemporaryDir dir;
-    Vault vault{dir.path()+"/fake-vault.keefi"};
+    Vault vault{dir.filePath("profile/fake-vault.keefi")};
     FakeTransport wire;
     BrokerTradingController controller{vault,&wire,nullptr,[](const AccountRecord& a){return std::make_unique<KiwoomAdapter>(a.environment,kiwoomNow);}};
     QString id;

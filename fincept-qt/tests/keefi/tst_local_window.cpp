@@ -20,6 +20,7 @@
 #include "keefi/PortfolioAssetModel.h"
 #include "keefi/PortfolioAllocation.h"
 #include "fixtures/ProviderReadFixture.h"
+#include "fixtures/SuspendedBrokerVault.h"
 #include "fixtures/BinanceUsdmResponses.h"
 #include "keefi/MarketMetrics.h"
 #include "keefi/OfficialCalendar.h"
@@ -757,6 +758,8 @@ void LocalWindowTest::brokerConnectionReturnsToOrigin_data() {
     QTest::newRow("create-kiwoom-domestic-daily") << QString("kiwoom") << QString("new-daily");
     QTest::newRow("unlock-reuse-existing") << QString("toss") << QString("reuse");
     QTest::newRow("unlock-replace-expired") << QString("toss") << QString("replace");
+    QTest::newRow("unlock-reuse-kiwoom") << QString("kiwoom") << QString("reuse");
+    QTest::newRow("unlock-replace-expired-kiwoom") << QString("kiwoom") << QString("replace");
     QTest::newRow("failed-read-retry") << QString("toss") << QString("retry");
 }
 
@@ -778,7 +781,7 @@ void LocalWindowTest::brokerConnectionReturnsToOrigin() {
     QVERIFY(lists.addIdentity(listId, stock));
     QVERIFY(lists.addIdentity(listId, coin));
     settings.setValue("chart/watchlists/v2", lists.publicState());
-    Vault vault(dir.filePath("test-vault"));
+    Vault vault(dir.filePath("profile/test-vault"));
     test::ReadFixture fixture(provider);
     const bool existing = mode == "reuse" || mode == "replace";
     if (existing) {
@@ -4484,11 +4487,8 @@ void LocalWindowTest::kiwoomOptionalAccountNumberIsComparisonOnly() {
 
 void LocalWindowTest::suspendedBrokersKeepOnlyRemovalAction() {
     QTemporaryDir temp;
-    const auto file = temp.filePath("credentials.keefi-vault");
-    QVERIFY(QFile::copy(QFINDTESTDATA("fixtures/suspended-brokers/credentials.keefi-vault"), file));
-    QVERIFY(QFile::setPermissions(file, QFileDevice::ReadOwner | QFileDevice::WriteOwner));
-    Vault vault(file);
-    QVERIFY(vault.unlock("Synthetic suspended brokers 2026!"));
+    Vault vault(temp.filePath("profile/credentials.keefi-vault"));
+    QVERIFY(test::openSuspendedBrokerFixture(vault));
     QCOMPARE(vault.accounts().size(), 2);
     int attempts = 0;
     NoNetworkBrokerTransport transport;

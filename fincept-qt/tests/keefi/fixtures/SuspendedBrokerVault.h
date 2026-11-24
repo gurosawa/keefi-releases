@@ -2,15 +2,25 @@
 
 #include "keefi/Vault.h"
 #include <QFile>
+#include <QFileInfo>
 #include <QTest>
 
 namespace keefi::test {
 // The fixture was written by Dev 110 using synthetic credentials for two live brokers.
 inline bool openSuspendedBrokerFixture(Vault& vault) {
-    const auto source = QFINDTESTDATA("suspended-brokers/credentials.keefi-vault");
-    return !source.isEmpty() && QFile::copy(source, vault.filePath()) &&
-           QFile::setPermissions(vault.filePath(), QFile::ReadOwner | QFile::WriteOwner) &&
-           vault.unlock(QStringLiteral("Synthetic suspended brokers 2026!"));
+    QFile source(QFINDTESTDATA("suspended-brokers/credentials.keefi-vault"));
+    if (!source.open(QIODevice::ReadOnly)
+        || !Vault::prepareProfileDirectory(QFileInfo(vault.filePath()).absolutePath())) return false;
+    // Create under the new profile so the fixture inherits its private Windows ACL.
+    // A native copy can also copy the checked-out fixture's security descriptor.
+    const auto bytes = source.readAll();
+    QFile copy(vault.filePath());
+    if (source.error() != QFileDevice::NoError || bytes.isEmpty()
+        || !copy.open(QIODevice::WriteOnly | QIODevice::NewOnly)
+        || !copy.setPermissions(QFile::ReadOwner | QFile::WriteOwner)
+        || copy.write(bytes) != bytes.size() || !copy.flush()) return false;
+    copy.close();
+    return vault.unlock(QStringLiteral("Synthetic suspended brokers 2026!"));
 }
 inline bool keepSingleSuspendedBroker(Vault& vault, const QString& provider, const QString& password) {
     if (!openSuspendedBrokerFixture(vault)) return false;

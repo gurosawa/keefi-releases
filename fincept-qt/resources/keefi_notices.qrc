@@ -1,0 +1,8 @@
+<RCC>
+  <qresource prefix="/keefi/notices">
+    <file alias="LICENSE">../../LICENSE</file>
+    <file alias="NOTICE">../../NOTICE</file>
+    <file alias="THIRD-PARTY-NOTICES.md">../../docs/keefi/THIRD-PARTY-NOTICES.md</file>
+    <file alias="font-sources.json">keefi/fonts/sources.json</file>
+  </qresource>
+</RCC>

@@ -1,0 +1,21 @@
+KEEFI
+Copyright (C) 2026 FINIX contributors.
+
+Derived from Fincept Terminal v4.5.1.
+Copyright (C) 2025-2026 Fincept Corporation and contributors.
+
+FINIX is provided under AGPL-3.0-or-later. The full license is in LICENSE.
+The upstream Licensing v3.0 declaration, effective August 11, 2026,
+withdraws Commercial License v2.0 and declares the open-source repository
+to be AGPL-3.0-or-later only:
+https://github.com/Fincept-Corporation/FinceptTerminal/blob/3d8617cae3f13c93874d4bee4fb0f2846e9c83bc/docs/COMMERCIAL_LICENSE.md
+
+KEEFI is an independently modified project, not an official Fincept release.
+Upstream trademarks remain with their respective owners.
+The former upstream root license file is retained for provenance only in
+docs/keefi/upstream/LICENSE.txt; its withdrawn commercial restrictions are
+not additional KEEFI license terms.
+
+Licensing summary: docs/keefi/LICENSING.md
+Dependency notices: docs/keefi/THIRD-PARTY-NOTICES.md
+The individual notices and licenses of third-party code are retained.

@@ -1,0 +1,347 @@
+{
+    "coinBaseline": {
+        "connections": [
+            {
+                "binding": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "id": "synthetic-local-registration",
+                "snapshot": "1792200000000"
+            }
+        ],
+        "kind": "coin-baseline-v1",
+        "netAssets": "100.01",
+        "policy": "synthetic-v1",
+        "scopes": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "time": "1792200000000"
+    },
+    "eventCount": 1,
+    "files": {
+        "portable.finixrtx": {
+            "bytes": 6709,
+            "magic": "FINIXRTX",
+            "sha256": "74586b6b6992fbf90b036dff6391e6f7c4040bdc4022b8d5dbe02aa399c99548"
+        },
+        "profile/assets-current.finix": {
+            "bytes": 1206,
+            "magic": "FINIXAST",
+            "sha256": "ae9b04d67d5fd4362c739ed11ed9d1a3b2cfb00a0ed4f75b6a8c9486d592d0b2"
+        },
+        "profile/assets.finix": {
+            "bytes": 4151,
+            "magic": "FINIXAST",
+            "sha256": "2299e525324af9a5eb8bab8e9e9e96f230c59f392a81e9dee0d6ebf2f95027be"
+        },
+        "profile/assets.finix.archive-11111111111111111111111111111111.finix": {
+            "bytes": 2347,
+            "magic": "FINIXAST",
+            "sha256": "bd288ffaf8a4b21d0b1cac48780e800634c636e4edecef8b32e87bcedbb050cd"
+        },
+        "profile/assets.finix.pre-schema3-5e1bd54c5784e92b5fe393fe4f0efdbc09891cc1963448dcc60c921e49420dce.finix": {
+            "bytes": 3424,
+            "magic": "FINIXAST",
+            "sha256": "5e1bd54c5784e92b5fe393fe4f0efdbc09891cc1963448dcc60c921e49420dce"
+        },
+        "profile/credentials.finix-vault": {
+            "bytes": 1132,
+            "magic": "FINIXVLT",
+            "sha256": "8320deaed7da9c062e5b8f5fa2bf6ee9e7c5d642d214c8473455b34859e64568"
+        },
+        "profile/imported-records.finix": {
+            "bytes": 6725,
+            "magic": "FINIXIMP",
+            "sha256": "26da8b0b6324ce2876191c33567bc7f2f654ed7533c9cdce8a3320ccf78bd5aa"
+        },
+        "profile/prices.finix": {
+            "bytes": 65592,
+            "magic": "FINIXPRC",
+            "sha256": "aa2aa41e9dd4ec2b63ceebba8e2536337d3b86238f17a4d2e8c4dc633f7def81"
+        },
+        "profile/prices.finix.exit": {
+            "bytes": 312,
+            "magic": "FINIXPRC",
+            "sha256": "6d5f6b8bea08be138d7762c30066a5cee60c5452c2950617ab780bc5c7f2337f"
+        },
+        "profile/swaps.finix": {
+            "bytes": 967,
+            "magic": "FINIXSWP",
+            "sha256": "afa946b7dc86a0bcc61b53239702f6a05dd6fc9ddafc7c5b41d6fdc4d36a96f8"
+        }
+    },
+    "latestSnapshotCount": 1,
+    "ledgerRootSha256": "ad7cf87591f559fa02ccf51168127fe07a2c64d0b2c01c418779ac99c4166d9b",
+    "orderCount": 1,
+    "packagePassword": "Synthetic portable Storage password 2026!",
+    "password": "Synthetic legacy Storage password 2026!",
+    "pendingOperations": [
+        {
+            "accountId": "synthetic-registration",
+            "clientId": "SYNTHETIC_CLIENT",
+            "createdAt": "1792200000000",
+            "environment": "live",
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "id": "synthetic-pending",
+            "kind": "place",
+            "orderId": "",
+            "price": "1.25",
+            "provider": "binance",
+            "quantity": "1",
+            "quoteAmount": "",
+            "replacementClientId": "",
+            "side": "buy",
+            "state": "pending",
+            "symbol": "BTCUSDT",
+            "type": "limit"
+        }
+    ],
+    "priceConflicts": 2,
+    "priceCount": 2,
+    "records": [
+        {
+            "identity": "51594b48f9122bb896bc535392ab1136f608e7e4e65be5e31f795df58476aa3c",
+            "kind": "event",
+            "origin": "a42d3d4d-76e6-435c-beaf-bdc954e2bde0",
+            "payload": {
+                "accountScope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                "asset": "KRW",
+                "evidence": {
+                    "complete": true,
+                    "receivedAtMs": "1792200000000",
+                    "scope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                    "source": "SYNTHETIC_OFFICIAL_SOURCE",
+                    "sourceTimeMs": "1792200000000",
+                    "url": "https://example.invalid/official"
+                },
+                "id": "345bac971e9d2b6d8baad257d63a8571705674d3c72c5d4d01ab8033b780ed06",
+                "kind": 6,
+                "officialId": "SYNTHETIC_FILL",
+                "peerAccountScope": "",
+                "quantity": "50",
+                "timeMs": "1792200000000",
+                "transferReference": ""
+            }
+        },
+        {
+            "identity": "c68d4c2c4b0830eb5fed1696a5ba3b57ba990236c237efd438d211240dcf7682",
+            "kind": "order",
+            "origin": "a42d3d4d-76e6-435c-beaf-bdc954e2bde0",
+            "payload": {
+                "accountScope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                "currency": "KRW",
+                "environment": "live",
+                "evidence": {
+                    "complete": true,
+                    "receivedAtMs": "1792200000000",
+                    "scope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                    "source": "SYNTHETIC_OFFICIAL_SOURCE",
+                    "sourceTimeMs": "1792200000000",
+                    "url": "https://example.invalid/official"
+                },
+                "executed": "1",
+                "market": "spot",
+                "observedAtMs": "1792200000000",
+                "orderFamily": "ordinary",
+                "orderId": "SYNTHETIC_ORDER",
+                "price": "1.25",
+                "provider": "binance",
+                "quantity": "3",
+                "quantityUnit": "base",
+                "quoteAmount": "1.25",
+                "side": "buy",
+                "status": "partial",
+                "type": "limit"
+            }
+        },
+        {
+            "identity": "850a2f610c08e7cefe3a1c1e3df75e9b0b1a4efbef18802920e09b19e49518cb",
+            "kind": "pending",
+            "origin": "a42d3d4d-76e6-435c-beaf-bdc954e2bde0",
+            "payload": {
+                "accountScope": "953a4831e74c8eac21791c08516fd3f8aa2d352a7653591f0ec0d9d7c879a873",
+                "clientId": "SYNTHETIC_CLIENT",
+                "createdAt": "1792200000000",
+                "environment": "live",
+                "id": "synthetic-pending",
+                "market": "spot",
+                "operation": "place",
+                "orderId": "",
+                "price": "1.25",
+                "provider": "binance",
+                "quantity": "1",
+                "quoteAmount": "",
+                "replacementClientId": "",
+                "side": "buy",
+                "state": "pending",
+                "symbol": "BTCUSDT",
+                "type": "limit"
+            }
+        },
+        {
+            "identity": "62799e6e428752ad44367566d1b556dca9f3edf96938af6c2277a94cf9e1ce73",
+            "kind": "snapshot",
+            "origin": "a42d3d4d-76e6-435c-beaf-bdc954e2bde0",
+            "payload": {
+                "accountScope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                "balanceComplete": true,
+                "components": [
+                    {
+                        "asset": "KRW",
+                        "costBasis": "",
+                        "costCurrency": "",
+                        "evidence": {
+                            "complete": true,
+                            "receivedAtMs": "1792200000000",
+                            "scope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                            "source": "SYNTHETIC_OFFICIAL_SOURCE",
+                            "sourceTimeMs": "1792200000000",
+                            "url": "https://example.invalid/official"
+                        },
+                        "id": "72f8f939a3e9aafd8525cacba507732118ec0dd3aff45f66575377d436285fae",
+                        "kind": 1,
+                        "providerUnrealizedPnl": "",
+                        "quantity": "100.01",
+                        "reportedValue": "",
+                        "reportedValueCurrency": "",
+                        "valuationGroup": "account"
+                    }
+                ],
+                "environment": "live",
+                "evidence": {
+                    "complete": true,
+                    "receivedAtMs": "1792200000000",
+                    "scope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                    "source": "SYNTHETIC_OFFICIAL_SOURCE",
+                    "sourceTimeMs": "1792200000000",
+                    "url": "https://example.invalid/official"
+                },
+                "id": "d39759e6782e03abbe22b7a75d7a9c5a6610df963cfa5c6ced5b500fdb66ec12",
+                "market": "spot",
+                "provider": "binance",
+                "reconciled": true,
+                "timeMs": "1792200000000"
+            }
+        },
+        {
+            "identity": "b25a45dcea2d30119d7c5d5ff4ed6013d68243c235d8fbe58f2c57dd80844d2b",
+            "kind": "snapshot",
+            "origin": "a42d3d4d-76e6-435c-beaf-bdc954e2bde0",
+            "payload": {
+                "accountScope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                "balanceComplete": true,
+                "components": [
+                    {
+                        "asset": "KRW",
+                        "costBasis": "",
+                        "costCurrency": "",
+                        "evidence": {
+                            "complete": true,
+                            "receivedAtMs": "1792200000000",
+                            "scope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                            "source": "SYNTHETIC_OFFICIAL_SOURCE",
+                            "sourceTimeMs": "1792200000000",
+                            "url": "https://example.invalid/official"
+                        },
+                        "id": "72f8f939a3e9aafd8525cacba507732118ec0dd3aff45f66575377d436285fae",
+                        "kind": 1,
+                        "providerUnrealizedPnl": "",
+                        "quantity": "100.01",
+                        "reportedValue": "",
+                        "reportedValueCurrency": "",
+                        "valuationGroup": "account"
+                    }
+                ],
+                "environment": "live",
+                "evidence": {
+                    "complete": true,
+                    "receivedAtMs": "1792200000000",
+                    "scope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                    "source": "SYNTHETIC_OFFICIAL_SOURCE",
+                    "sourceTimeMs": "1792200000000",
+                    "url": "https://example.invalid/official"
+                },
+                "id": "04fd8a244cda617feb69679393319b412eed02a57de89956080bcb386b8cf8d7",
+                "market": "spot",
+                "provider": "binance",
+                "reconciled": true,
+                "timeMs": "1792200000000"
+            }
+        },
+        {
+            "identity": "cd2006fe218a085ef9bc7ac34b6dd4ffd99c4b7791c100c9de376a64d59b8b03",
+            "kind": "snapshot",
+            "origin": "a42d3d4d-76e6-435c-beaf-bdc954e2bde0",
+            "payload": {
+                "accountScope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                "balanceComplete": true,
+                "components": [
+                    {
+                        "asset": "KRW",
+                        "costBasis": "",
+                        "costCurrency": "",
+                        "evidence": {
+                            "complete": true,
+                            "receivedAtMs": "1792200000000",
+                            "scope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                            "source": "SYNTHETIC_OFFICIAL_SOURCE",
+                            "sourceTimeMs": "1792200000000",
+                            "url": "https://example.invalid/official"
+                        },
+                        "id": "72f8f939a3e9aafd8525cacba507732118ec0dd3aff45f66575377d436285fae",
+                        "kind": 1,
+                        "providerUnrealizedPnl": "",
+                        "quantity": "100.01",
+                        "reportedValue": "",
+                        "reportedValueCurrency": "",
+                        "valuationGroup": "account"
+                    }
+                ],
+                "environment": "live",
+                "evidence": {
+                    "complete": true,
+                    "receivedAtMs": "1792200000000",
+                    "scope": "0efee476437dd7a51531d502f427ed314733149d5ac2dd16859172846259a138",
+                    "source": "SYNTHETIC_OFFICIAL_SOURCE",
+                    "sourceTimeMs": "1792200000000",
+                    "url": "https://example.invalid/official"
+                },
+                "id": "85f56430e133db2285e90216b11e3be71fc9ea289056ab27b61a8edc3e05c770",
+                "market": "spot",
+                "provider": "binance",
+                "reconciled": true,
+                "timeMs": "1792200000000"
+            }
+        },
+        {
+            "identity": "f9f47a3b6aa70ea3949550b7be5df82ee51aa728b9fc055fe1e439ba76f96f95",
+            "kind": "swap",
+            "origin": "a42d3d4d-76e6-435c-beaf-bdc954e2bde0",
+            "payload": {
+                "accountScope": "854ab81e52d77abff87ebe4a511a9f9152477910abda48f178e6cb22b89c3d70",
+                "actualFeeLamports": "5000",
+                "actualInputAtomic": "",
+                "actualOutputAtomic": "",
+                "chain": "solana-mainnet",
+                "confirmedSlot": "200",
+                "createdAt": "1792200000000",
+                "environment": "mainnet",
+                "id": "00000000-0000-4000-8000-000000000001",
+                "inputAtomic": "1000000",
+                "inputMint": "So11111111111111111111111111111111111111112",
+                "lastValidBlockHeight": "100",
+                "market": "solana",
+                "messageHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "minimumRouteOutput": "500",
+                "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                "provider": "jupiter",
+                "requestId": "SYNTHETIC_REQUEST",
+                "slippageBps": "50",
+                "state": "confirmed",
+                "transactionId": "3T2Yoh84UgzxF9WDDqAwQbVCEJQPabifpBXLF4EjFy2oKz5px7U2qmVxCc7tjE5ctTGEzXEbCgdYrYWQeYCkk7K7",
+                "wallet": "97GUB8tDxneBjs1uLr9Fv3cYJ4F9pdPQ3xyjzcNteyhq"
+            }
+        }
+    ],
+    "snapshotCount": 2,
+    "swapCount": 1,
+    "synthetic": true
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="토스증권 계좌를 연결해 국내·미국 주식의 보유 자산과 가격 차트를 확인하세요.">
+  <title>토스증권 연결 · KEEFI</title>
+  <link rel="stylesheet" href="/guide.css">
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="topbar">
+    <div class="frame bar-inner"><a class="brand" href="/" aria-label="KEEFI 연결 가이드 홈">KEEFI</a><span class="bar-rule"></span><a class="bar-name" href="/">연결 가이드</a></div>
+  </header>
+  <main class="frame guide" id="main">
+    <nav class="crumb" aria-label="현재 위치"><a href="/">전체 가이드</a><span aria-hidden="true">/</span><span>토스증권</span></nav>
+    <div class="hero">
+      <div class="hero-copy"><p class="eyebrow">국내·미국 주식</p><h1>토스증권 연결</h1><p class="intro">토스증권 계좌를 연결해 국내·미국 주식의 보유 자산과 가격 차트를 확인하세요.</p>
+        <a href="https://www.tossinvest.com/open-api/landing" class="issue-link" rel="noopener noreferrer" target="_blank">토스증권에서 키 발급 <span class="arrow" aria-hidden="true">↗</span><span class="sr"> (새 탭)</span></a>
+      </div>
+      <section class="mapping" aria-label="발급받은 키와 KEEFI 입력칸 대응표">
+        <h2>발급받은 키와 입력칸</h2>
+        <table><thead><tr><th scope="col">토스증권 발급 화면</th><th scope="col">KEEFI 입력칸</th></tr></thead><tbody>
+            <tr><td>Client ID</td><td>Client ID</td></tr>
+            <tr><td>Client Secret</td><td>Client Secret</td></tr>
+          </tbody></table>
+      </section>
+    </div>
+    <div class="content">
+      <nav class="contents" aria-label="페이지 안에서 이동"><strong>이 가이드에서</strong><a href="#steps">연결 순서</a><a href="#questions">자주 막히는 곳</a><a href="#official">공식 안내</a></nav>
+      <div class="article">
+        <section id="steps"><h2>연결 순서</h2><ol class="steps">
+          <li><h3>토스증권에서 Open API 열기</h3><p>이 페이지 상단의 <strong>토스증권에서 키 발급</strong>을 누르고 토스증권 계좌가 있는 계정으로 로그인하세요.</p></li>
+          <li><h3>키 발급과 허용 IP 확인</h3><p>Client ID와 Client Secret을 발급받으세요. 토스증권 웹의 <strong>설정 → Open API → 허용 IP 관리</strong>에서 KEEFI를 실행할 PC의 공인 IP를 확인하고 등록하세요.</p></li>
+          <li><h3>KEEFI에서 토스증권 연결</h3><p>열어 둔 KEEFI 연결 창으로 돌아가 두 값을 같은 이름의 칸에 붙여넣으세요. 금고를 열고 <strong>저장하고 연결</strong>을 누릅니다. 차트에서 시작했다면 조회가 완료되는 즉시 보던 종목과 시간봉으로 돌아갑니다. 조회가 끝나기 전에 돌아가려면 <strong>보던 차트로 돌아가기</strong>를 누르세요.</p></li>
+        </ol></section>
+        <section id="questions"><h2>자주 막히는 곳</h2>
+          <details><summary>IP가 허용되지 않았다고 떠요</summary><p>PC에서 쓰는 인터넷이나 VPN을 바꿨다면 토스증권의 허용 IP를 다시 확인하세요.</p></details>
+          <details><summary>이미 등록했는데 차트가 비어 있어요</summary><p>KEEFI 금고가 열려 있는지 먼저 확인하세요. 인증 만료 안내가 보인다면 계좌·연결에서 토스증권을 다시 연결하세요.</p></details>
+        </section>
+        <section id="official" class="official"><h2>공식 안내</h2><a href="https://home.tossinvest.com/ko/open-api" rel="noopener noreferrer" target="_blank">토스증권 공식 발급 안내 <span class="arrow" aria-hidden="true">↗</span><span class="sr"> (새 탭)</span></a></section>
+      </div>
+    </div>
+  </main>
+  <footer><div class="frame footer-inner"><strong>KEEFI</strong><span>API 키는 KEEFI 앱의 로컬 금고에 저장합니다.</span></div></footer>
+</body>
+</html>

@@ -1,0 +1,368 @@
+{
+  "format": "keefi-valuation-bundle/1",
+  "note": "합성 예시. 실제 계좌·가격이 아니다.",
+  "as_of_ms": 1792508400000,
+  "connections": [
+    {
+      "id": "c-upbit",
+      "alias": "업비트",
+      "provider": "upbit",
+      "environment": "live",
+      "market": "spot",
+      "state": "complete"
+    },
+    {
+      "id": "c-binance",
+      "alias": "바이낸스",
+      "provider": "binance",
+      "environment": "live",
+      "market": "spot",
+      "state": "complete"
+    },
+    {
+      "id": "c-binance-f",
+      "alias": "바이낸스 선물",
+      "provider": "binance",
+      "environment": "live",
+      "market": "usdm_futures",
+      "state": "complete"
+    },
+    {
+      "id": "c-phantom",
+      "alias": "팬텀",
+      "provider": "phantom",
+      "environment": "mainnet",
+      "market": "solana",
+      "state": "complete"
+    },
+    {
+      "id": "c-kis",
+      "alias": "한국투자",
+      "provider": "kis",
+      "environment": "live",
+      "market": "domestic_equity",
+      "state": "complete"
+    }
+  ],
+  "snapshots": [
+    {
+      "account_scope": "upbit-1",
+      "connection_id": "c-upbit",
+      "provider": "upbit",
+      "environment": "live",
+      "market": "spot",
+      "time_ms": 1792508396000,
+      "balance_complete": true,
+      "evidence": {
+        "source": "upbit balance",
+        "url": "https://example.invalid",
+        "scope": "upbit-1",
+        "source_time_ms": 0,
+        "received_at_ms": 1792508396000,
+        "complete": true
+      },
+      "components": [
+        {
+          "id": "spot:KRW",
+          "asset": "KRW",
+          "kind": "Cash",
+          "quantity": "1250000.5",
+          "valuation_group": "spot"
+        },
+        {
+          "id": "spot:BTC",
+          "asset": "BTC",
+          "kind": "Holding",
+          "quantity": "0.01234567",
+          "valuation_group": "spot"
+        },
+        {
+          "id": "spot:ETH",
+          "asset": "ETH",
+          "kind": "Holding",
+          "quantity": "0.00001",
+          "valuation_group": "spot"
+        },
+        {
+          "id": "spot:XRP",
+          "asset": "XRP",
+          "kind": "Holding",
+          "quantity": "0",
+          "valuation_group": "spot"
+        }
+      ]
+    },
+    {
+      "account_scope": "binance-spot",
+      "connection_id": "c-binance",
+      "provider": "binance",
+      "environment": "live",
+      "market": "spot",
+      "time_ms": 1792508394000,
+      "balance_complete": true,
+      "evidence": {
+        "source": "binance balance",
+        "url": "https://example.invalid",
+        "scope": "binance-spot",
+        "source_time_ms": 0,
+        "received_at_ms": 1792508394000,
+        "complete": true
+      },
+      "components": [
+        {
+          "id": "spot:BTC",
+          "asset": "BTC",
+          "kind": "Holding",
+          "quantity": "0.005",
+          "valuation_group": "spot"
+        },
+        {
+          "id": "spot:ZEC",
+          "asset": "ZEC",
+          "kind": "Holding",
+          "quantity": "3.2",
+          "valuation_group": "spot"
+        },
+        {
+          "id": "spot:USDT",
+          "asset": "USDT",
+          "kind": "Holding",
+          "quantity": "120.5",
+          "valuation_group": "spot"
+        }
+      ]
+    },
+    {
+      "account_scope": "binance-futures",
+      "connection_id": "c-binance-f",
+      "provider": "binance",
+      "environment": "live",
+      "market": "usdm_futures",
+      "time_ms": 1792508370000,
+      "balance_complete": true,
+      "evidence": {
+        "source": "binance balance",
+        "url": "https://example.invalid",
+        "scope": "binance-futures",
+        "source_time_ms": 0,
+        "received_at_ms": 1792508370000,
+        "complete": true
+      },
+      "components": [
+        {
+          "id": "usdm:USDT",
+          "asset": "USDT",
+          "kind": "Equity",
+          "quantity": "250.75",
+          "valuation_group": "usdm",
+          "provider_unrealized_pnl": "-3.2",
+          "provider_pnl_currency": "USDT"
+        },
+        {
+          "id": "position:BTCUSDT:BOTH",
+          "asset": "BTCUSDT",
+          "kind": "PositionNotional",
+          "quantity": "0.01",
+          "valuation_group": "positions"
+        }
+      ]
+    },
+    {
+      "account_scope": "phantom",
+      "connection_id": "c-phantom",
+      "provider": "phantom",
+      "environment": "mainnet",
+      "market": "solana",
+      "time_ms": 1792508350000,
+      "balance_complete": true,
+      "evidence": {
+        "source": "phantom balance",
+        "url": "https://example.invalid",
+        "scope": "phantom",
+        "source_time_ms": 0,
+        "received_at_ms": 1792508350000,
+        "complete": true
+      },
+      "components": [
+        {
+          "id": "solana:native",
+          "asset": "SOL",
+          "kind": "Holding",
+          "quantity": "1.5",
+          "valuation_group": "solana"
+        },
+        {
+          "id": "Tokenkeg:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "asset": "solana:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "kind": "Holding",
+          "quantity": "100",
+          "valuation_group": "solana"
+        },
+        {
+          "id": "Tokenz:SKHYhSjuRWHgikq8eRKbtBbpABgJSkd7ytQV14i9EQ3",
+          "asset": "solana:SKHYhSjuRWHgikq8eRKbtBbpABgJSkd7ytQV14i9EQ3",
+          "kind": "Holding",
+          "quantity": "2",
+          "valuation_group": "solana"
+        }
+      ]
+    },
+    {
+      "account_scope": "kis",
+      "connection_id": "c-kis",
+      "provider": "kis",
+      "environment": "live",
+      "market": "domestic_equity",
+      "time_ms": 1792508355000,
+      "balance_complete": true,
+      "evidence": {
+        "source": "kis balance",
+        "url": "https://example.invalid",
+        "scope": "kis",
+        "source_time_ms": 0,
+        "received_at_ms": 1792508355000,
+        "complete": true
+      },
+      "components": [
+        {
+          "id": "005930",
+          "asset": "005930",
+          "kind": "Holding",
+          "quantity": "10",
+          "valuation_group": "account",
+          "reported_value": "712000",
+          "reported_value_currency": "KRW"
+        },
+        {
+          "id": "depositCash",
+          "asset": "KRW",
+          "kind": "Cash",
+          "quantity": "50000",
+          "valuation_group": "account"
+        },
+        {
+          "id": "buyingPower",
+          "asset": "KRW",
+          "kind": "BuyingPower",
+          "quantity": "50000",
+          "valuation_group": "account"
+        }
+      ]
+    }
+  ],
+  "quotes": [
+    {
+      "base": "BTC",
+      "quote": "KRW",
+      "price": "152345000",
+      "venue": "upbit",
+      "evidence": {
+        "source": "upbit public",
+        "url": "https://example.invalid",
+        "scope": "public:upbit:KRW-BTC",
+        "source_time_ms": 1792508399000,
+        "received_at_ms": 1792508399000,
+        "complete": true
+      }
+    },
+    {
+      "base": "ETH",
+      "quote": "KRW",
+      "price": "5512000",
+      "venue": "upbit",
+      "evidence": {
+        "source": "upbit public",
+        "url": "https://example.invalid",
+        "scope": "public:upbit:KRW-ETH",
+        "source_time_ms": 1792508399000,
+        "received_at_ms": 1792508399000,
+        "complete": true
+      }
+    },
+    {
+      "base": "SOL",
+      "quote": "KRW",
+      "price": "270150",
+      "venue": "upbit",
+      "evidence": {
+        "source": "upbit public",
+        "url": "https://example.invalid",
+        "scope": "public:upbit:KRW-SOL",
+        "source_time_ms": 1792508399000,
+        "received_at_ms": 1792508399000,
+        "complete": true
+      }
+    },
+    {
+      "base": "USDT",
+      "quote": "KRW",
+      "price": "1412",
+      "venue": "upbit",
+      "evidence": {
+        "source": "upbit public",
+        "url": "https://example.invalid",
+        "scope": "public:upbit:KRW-USDT",
+        "source_time_ms": 1792508399000,
+        "received_at_ms": 1792508399000,
+        "complete": true
+      }
+    },
+    {
+      "base": "USDC",
+      "quote": "KRW",
+      "price": "1411",
+      "venue": "upbit",
+      "evidence": {
+        "source": "upbit public",
+        "url": "https://example.invalid",
+        "scope": "public:upbit:KRW-USDC",
+        "source_time_ms": 1792508398000,
+        "received_at_ms": 1792508398000,
+        "complete": true
+      }
+    },
+    {
+      "base": "ZEC",
+      "quote": "USDT",
+      "price": "48.5",
+      "venue": "binance",
+      "evidence": {
+        "source": "binance public",
+        "url": "https://example.invalid",
+        "scope": "public:binance:ZECUSDT",
+        "source_time_ms": 1792508398500,
+        "received_at_ms": 1792508398500,
+        "complete": true
+      }
+    },
+    {
+      "base": "solana:SKHYhSjuRWHgikq8eRKbtBbpABgJSkd7ytQV14i9EQ3",
+      "quote": "USD",
+      "price": "410.25",
+      "venue": "jupiter",
+      "evidence": {
+        "source": "jupiter public",
+        "url": "https://example.invalid",
+        "scope": "public:jupiter:price:SKHYhSjuRWHgikq8eRKbtBbpABgJSkd7ytQV14i9EQ3",
+        "source_time_ms": 1792508359000,
+        "received_at_ms": 1792508360000,
+        "complete": true
+      }
+    },
+    {
+      "base": "solana:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "quote": "USD",
+      "price": "0.99985",
+      "venue": "jupiter",
+      "evidence": {
+        "source": "jupiter public",
+        "url": "https://example.invalid",
+        "scope": "public:jupiter:price:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "source_time_ms": 1792508359000,
+        "received_at_ms": 1792508360000,
+        "complete": true
+      }
+    }
+  ],
+  "reference_quotes": []
+}

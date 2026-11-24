@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="키움 REST에서 받은 두 파일로 계좌를 연결하고 국내 주식의 일봉을 확인하세요.">
+  <title>키움증권 연결 · KEEFI</title>
+  <link rel="stylesheet" href="/guide.css">
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="topbar">
+    <div class="frame bar-inner"><a class="brand" href="/" aria-label="KEEFI 연결 가이드 홈">KEEFI</a><span class="bar-rule"></span><a class="bar-name" href="/">연결 가이드</a></div>
+  </header>
+  <main class="frame guide" id="main">
+    <nav class="crumb" aria-label="현재 위치"><a href="/">전체 가이드</a><span aria-hidden="true">/</span><span>키움증권</span></nav>
+    <div class="hero">
+      <div class="hero-copy"><p class="eyebrow">국내 주식 일봉</p><h1>키움증권 연결</h1><p class="intro">키움 REST에서 받은 두 파일로 계좌를 연결하고 국내 주식의 일봉을 확인하세요.</p>
+        <a href="https://openapi.kiwoom.com/mgmt/VOpenApiRegView" class="issue-link" rel="noopener noreferrer" target="_blank">키움에서 API 사용 신청 <span class="arrow" aria-hidden="true">↗</span><span class="sr"> (새 탭)</span></a>
+      </div>
+      <section class="mapping" aria-label="발급받은 키와 KEEFI 입력칸 대응표">
+        <h2>내려받은 파일과 입력칸</h2>
+        <table><thead><tr><th scope="col">키움증권 파일</th><th scope="col">KEEFI 입력칸</th></tr></thead><tbody>
+            <tr><td>계좌번호_appkey.txt</td><td>App Key</td></tr>
+            <tr><td>계좌번호_appsecret.txt</td><td>App Secret</td></tr>
+          </tbody></table>
+      </section>
+    </div>
+    <div class="content">
+      <nav class="contents" aria-label="페이지 안에서 이동"><strong>이 가이드에서</strong><a href="#steps">연결 순서</a><a href="#questions">자주 막히는 곳</a><a href="#official">공식 안내</a></nav>
+      <div class="article">
+        <section id="steps"><h2>연결 순서</h2><ol class="steps">
+          <li><h3>키움 REST API 사용 신청</h3><p>키움증권 계좌로 공식 포털에 로그인하세요. <strong>API 사용신청</strong>에서 서비스 이용 신청을 마칩니다.</p></li>
+          <li><h3>실전 계좌와 공인 IP 등록</h3><p><strong>계좌 App Key 관리</strong>에서 KEEFI를 실행할 PC의 공인 IP를 추가하세요. 연결할 실전 계좌를 등록하고 본인 인증을 마칩니다.</p></li>
+          <li><h3>App Key와 App Secret 파일 받기</h3><p>신청 현황에서 App Key와 App Secret을 각각 다운로드하세요. 키움은 각 파일을 한 번만 내려받게 하므로 두 파일을 안전한 위치에 보관하세요.</p></li>
+          <li><h3>KEEFI에서 두 파일 불러오기</h3><p>KEEFI 연결 창에서 <strong>키움 REST → 키 파일 2개 불러오기</strong>를 선택한 뒤 같은 계좌의 파일 두 개를 함께 선택하세요. 두 입력칸이 채워지면 <strong>저장하고 연결</strong>을 누릅니다. 차트에서 시작했다면 조회가 완료되는 즉시 보던 종목과 시간봉으로 돌아갑니다. 조회가 끝나기 전에 돌아가려면 <strong>보던 차트로 돌아가기</strong>를 누르세요.</p></li>
+        </ol></section>
+        <section id="questions"><h2>자주 막히는 곳</h2>
+          <details><summary>키 파일을 인식하지 못해요</summary><p>내려받은 원래 파일 이름과 두 파일 앞부분의 계좌번호가 같은지 확인하세요. 직접 입력하려면 각 파일의 값을 KEEFI의 App Key와 App Secret 칸에 넣으세요.</p></details>
+          <details><summary>국내 분봉이나 미국 주식도 보고 싶어요</summary><p>KEEFI에서 키움 연결은 국내 주식 일봉을 제공합니다. 국내 장중봉이나 미국 주식은 토스증권 연결을 선택하세요.</p></details>
+        </section>
+        <section id="official" class="official"><h2>공식 안내</h2><a href="https://openapi.kiwoom.com/intro/serviceInfo" rel="noopener noreferrer" target="_blank">키움증권 공식 발급 안내 <span class="arrow" aria-hidden="true">↗</span><span class="sr"> (새 탭)</span></a></section>
+      </div>
+    </div>
+  </main>
+  <footer><div class="frame footer-inner"><strong>KEEFI</strong><span>API 키는 KEEFI 앱의 로컬 금고에 저장합니다.</span></div></footer>
+</body>
+</html>

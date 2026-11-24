@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="OKX Global 실전 계정의 잔고나 선물 포지션을 조회합니다. API Key, Secret Key, 키를 만들 때 정한 Passphrase를 준비하세요.">
+  <title>OKX 연결 · KEEFI</title>
+  <link rel="stylesheet" href="/guide.css">
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="topbar">
+    <div class="frame bar-inner"><a class="brand" href="/" aria-label="KEEFI 연결 가이드 홈">KEEFI</a><span class="bar-rule"></span><a class="bar-name" href="/">연결 가이드</a></div>
+  </header>
+  <main class="frame guide" id="main">
+    <nav class="crumb" aria-label="현재 위치"><a href="/">전체 가이드</a><span aria-hidden="true">/</span><span>OKX</span></nav>
+    <div class="hero">
+      <div class="hero-copy"><p class="eyebrow">Global 계정 · 현물·선물</p><h1>OKX 연결</h1><p class="intro">OKX Global 실전 계정의 잔고나 선물 포지션을 조회합니다. API Key, Secret Key, 키를 만들 때 정한 Passphrase를 준비하세요.</p>
+        <a href="https://www.okx.com/account/my-api" class="issue-link" rel="noopener noreferrer" target="_blank">OKX API 관리 열기 <span class="arrow" aria-hidden="true">↗</span><span class="sr"> (새 탭)</span></a>
+      </div>
+      <section class="mapping" aria-label="발급받은 키와 KEEFI 입력칸 대응표">
+        <h2>발급받은 키와 입력칸</h2>
+        <table><thead><tr><th scope="col">OKX 발급 화면</th><th scope="col">KEEFI 입력칸</th></tr></thead><tbody>
+            <tr><td>API Key</td><td>API Key</td></tr>
+            <tr><td>Secret Key</td><td>Secret</td></tr>
+            <tr><td>키 생성 시 정한 Passphrase</td><td>Passphrase</td></tr>
+          </tbody></table>
+      </section>
+    </div>
+    <div class="content">
+      <nav class="contents" aria-label="페이지 안에서 이동"><strong>이 가이드에서</strong><a href="#steps">연결 순서</a><a href="#questions">자주 막히는 곳</a><a href="#official">공식 안내</a></nav>
+      <div class="article">
+        <section id="steps"><h2>연결 순서</h2><ol class="steps">
+          <li><h3>조회할 계정에서 키 만들기</h3><p>OKX Global 웹에 로그인하고 프로필에서 <strong>API and connections → Create API key</strong>를 여세요. 키 이름을 정하고, 보려는 잔고가 있는 계정이나 하위 계정을 선택하세요.</p></li>
+          <li><h3>Read 권한 선택</h3><p><strong>Permissions</strong>에서 <strong>Read</strong>만 켜세요. IP 허용 목록을 사용한다면 KEEFI를 실행할 PC의 공인 IP를 입력하세요.</p></li>
+          <li><h3>Passphrase 정하기</h3><p>이번 API 키에 사용할 <strong>Passphrase</strong>를 직접 정하고 보안 인증을 마치세요. 발급된 API Key, Secret Key와 함께 보관하세요. Passphrase는 생성 후 다시 확인할 수 없습니다.</p></li>
+          <li><h3>KEEFI에 세 값 입력</h3><p><strong>계좌·연결 → 계좌 연결 → OKX</strong>를 여세요. 잔고는 <strong>현물</strong>, 무기한·만기 선물 포지션은 <strong>SWAP·FUTURES</strong>를 선택합니다. 표에 맞춰 세 값을 입력하고 금고를 연 뒤 <strong>저장하고 연결</strong>을 누르세요.</p></li>
+        </ol></section>
+        <section id="questions"><h2>자주 막히는 곳</h2>
+          <details><summary>지역을 선택하는 칸이 없어요</summary><p>현재 KEEFI의 신규 OKX 연결은 Global 등록 실전 계정을 사용합니다. 미국·유럽경제지역(EEA)에 별도 등록한 계정과 데모 계정은 신규 연결을 지원하지 않습니다.</p></details>
+          <details><summary>Passphrase 인증에 실패해요</summary><p>해당 API 키를 만들 때 정한 문자열을 대소문자까지 그대로 입력하세요. KEEFI는 Passphrase 앞뒤의 공백도 보존합니다. 잊어버렸다면 OKX에서 새 키와 Passphrase를 만들어 세 값을 함께 등록하세요.</p></details>
+        </section>
+        <section id="official" class="official"><h2>공식 안내</h2><a href="https://www.okx.com/help/api-faq" rel="noopener noreferrer" target="_blank">OKX 공식 API 키 발급·관리 안내 <span class="arrow" aria-hidden="true">↗</span><span class="sr"> (새 탭)</span></a></section>
+      </div>
+    </div>
+  </main>
+  <footer><div class="frame footer-inner"><strong>KEEFI</strong><span>API 키는 KEEFI 앱의 로컬 금고에 저장합니다.</span></div></footer>
+</body>
+</html>

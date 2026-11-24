@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="업비트 자산조회 키를 연결해 내 코인 잔고를 확인하세요. 공개 코인 차트는 계좌 연결 없이 볼 수 있습니다.">
+  <title>업비트 연결 · KEEFI</title>
+  <link rel="stylesheet" href="/guide.css">
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="topbar">
+    <div class="frame bar-inner"><a class="brand" href="/" aria-label="KEEFI 연결 가이드 홈">KEEFI</a><span class="bar-rule"></span><a class="bar-name" href="/">연결 가이드</a></div>
+  </header>
+  <main class="frame guide" id="main">
+    <nav class="crumb" aria-label="현재 위치"><a href="/">전체 가이드</a><span aria-hidden="true">/</span><span>업비트</span></nav>
+    <div class="hero">
+      <div class="hero-copy"><p class="eyebrow">코인 보유 자산</p><h1>업비트 연결</h1><p class="intro">업비트 자산조회 키를 연결해 내 코인 잔고를 확인하세요. 공개 코인 차트는 계좌 연결 없이 볼 수 있습니다.</p>
+        <a href="https://upbit.com/mypage/open_api_management" class="issue-link" rel="noopener noreferrer" target="_blank">업비트 Open API 관리 열기 <span class="arrow" aria-hidden="true">↗</span><span class="sr"> (새 탭)</span></a>
+      </div>
+      <section class="mapping" aria-label="발급받은 키와 KEEFI 입력칸 대응표">
+        <h2>발급받은 키와 입력칸</h2>
+        <table><thead><tr><th scope="col">업비트 발급 화면</th><th scope="col">KEEFI 입력칸</th></tr></thead><tbody>
+            <tr><td>Access Key</td><td>Access Key</td></tr>
+            <tr><td>Secret Key</td><td>Secret</td></tr>
+          </tbody></table>
+      </section>
+    </div>
+    <div class="content">
+      <nav class="contents" aria-label="페이지 안에서 이동"><strong>이 가이드에서</strong><a href="#steps">연결 순서</a><a href="#questions">자주 막히는 곳</a><a href="#official">공식 안내</a></nav>
+      <div class="article">
+        <section id="steps"><h2>연결 순서</h2><ol class="steps">
+          <li><h3>PC 웹에서 Open API 관리 열기</h3><p>고객 확인과 2채널 인증을 마친 업비트 계정으로 PC 웹에 로그인하세요. <strong>마이페이지 → Open API 관리</strong>를 엽니다.</p></li>
+          <li><h3>자산조회 권한과 허용 IP 설정</h3><p>계좌 잔고 확인에 필요한 <strong>자산조회</strong> 권한을 선택하고, KEEFI를 실행할 PC의 공인 IP를 등록하세요. 조회용 키에는 주문·출금 권한이 필요하지 않습니다.</p></li>
+          <li><h3>발급한 두 값 확인</h3><p>Open API Key 발급을 요청하고 2채널 인증을 마치세요. <strong>Secret Key는 최초 발급 때만</strong> 볼 수 있으니 발급 화면이 열려 있을 때 KEEFI에 입력하세요.</p></li>
+          <li><h3>KEEFI에서 업비트 연결</h3><p>KEEFI의 <strong>Upbit</strong> 연결 창으로 돌아가 Access Key와 Secret을 각각 붙여넣으세요. 금고를 열고 <strong>저장하고 연결</strong>을 누른 뒤 자산 조회 결과를 확인하세요.</p></li>
+        </ol></section>
+        <section id="questions"><h2>자주 막히는 곳</h2>
+          <details><summary>휴대폰에서 발급 메뉴를 찾을 수 없어요</summary><p>업비트 API 키 발급은 PC 웹에서 진행합니다. 휴대폰은 2채널 인증 단계에서 사용할 수 있습니다.</p></details>
+          <details><summary>자산조회 권한 또는 IP 오류가 떠요</summary><p>업비트 Open API 관리에서 발급한 키의 자산조회 권한과 현재 PC의 허용 공인 IP를 확인하세요.</p></details>
+        </section>
+        <section id="official" class="official"><h2>공식 안내</h2><a href="https://docs.upbit.com/kr/docs/api-key" rel="noopener noreferrer" target="_blank">업비트 공식 발급 안내 <span class="arrow" aria-hidden="true">↗</span><span class="sr"> (새 탭)</span></a></section>
+      </div>
+    </div>
+  </main>
+  <footer><div class="frame footer-inner"><strong>KEEFI</strong><span>API 키는 KEEFI 앱의 로컬 금고에 저장합니다.</span></div></footer>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{
+  "schema": "keefi-chart-phrases/1",
+  "language": "ko-KR",
+  "id": "keefi_plain",
+  "name": "KEEFI 기본 문장",
+  "templates": {
+    "pullback": [
+      {"id":"plain_pb_a","text":"{sym} {tf} 눌림존 점수는 {score}점이에요. 마감된 봉 {n}개를 기준으로 계산했어요."},
+      {"id":"plain_pb_b","text":"{sym} {tf} 차트가 눌림존에 들어왔어요. 점수는 {score}점이고 마감된 봉 {n}개 기준이에요."}
+    ],
+    "result_up": [
+      {"id":"plain_up_a","text":"{sym} {tf} 신호 후 {horizon} 동안 {ret}% 올랐어요. 과거 {n}건 기준이고 수수료는 반영하지 않았어요."},
+      {"id":"plain_up_b","text":"{sym} {tf} 신호를 {horizon} 동안 지켜봤더니 {ret}% 올랐어요. 수수료 반영 전 {n}건 기준이에요."}
+    ],
+    "result_down": [
+      {"id":"plain_down_a","text":"{sym} {tf} 신호 후 {horizon} 동안 {ret}% 내렸어요. 과거 {n}건 기준이고 수수료는 반영하지 않았어요."},
+      {"id":"plain_down_b","text":"{sym} {tf} 신호를 {horizon} 동안 지켜봤더니 {ret}% 내렸어요. 수수료 반영 전 {n}건 기준이에요."}
+    ],
+    "result_flat": [
+      {"id":"plain_flat_a","text":"{sym} {tf} 신호 후 {horizon} 뒤 변동은 {ret}%로 제자리예요. 수수료 반영 전 {n}건 기준이에요."},
+      {"id":"plain_flat_b","text":"{sym} {tf} 신호를 {horizon} 동안 봤더니 변동이 {ret}%에 그쳤어요. 수수료 반영 전 {n}건 기준이에요."}
+    ],
+    "notice": [
+      {"id":"plain_notice_a","text":"{source}에 {sym} 공식 공지가 {n}건 올라왔어요."},
+      {"id":"plain_notice_b","text":"{source}에서 발표한 {sym} 공지 {n}건을 찾았어요."}
+    ],
+    "line": [
+      {"id":"plain_line_a","text":"{sym} {tf} 차트가 기준선 {price} {currency}에 닿았어요. 인접한 완료 봉 {n}개로 확인했어요."},
+      {"id":"plain_line_b","text":"{sym} {tf} 가격이 기준선 {price} {currency}에 도달했어요. 인접한 완료 봉 {n}개를 비교했어요."}
+    ],
+    "whale": [
+      {"id":"plain_whale_a","text":"{sym} {tf}에서 {signal} 흐름이 나타났어요. 유효 관측 표본 {n}개를 사용했어요."},
+      {"id":"plain_whale_b","text":"{sym} {tf}에 {signal} 신호가 잡혔어요. 유효 관측 표본 {n}개 기준이에요."}
+    ]
+  }
+}

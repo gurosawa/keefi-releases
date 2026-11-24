@@ -1,0 +1,270 @@
+{
+  "format": "keefi-g8-history-synthetic/1",
+  "notice": "Synthetic fixtures only. No private account data.",
+  "cases": [
+    {
+      "name": "full",
+      "opening": {
+        "format": "keefi-valuation-bundle/1",
+        "as_of_ms": 1792594860000,
+        "connections": [
+          {"id": "FAKE_CONNECTION", "state": "complete", "environment": "live"}
+        ],
+        "snapshots": [
+          {
+            "id": "FAKE-full-1792594860000",
+            "account_scope": "FAKE_SCOPE",
+            "connection_id": "FAKE_CONNECTION",
+            "connection_binding": "FAKE_BINDING",
+            "provider": "fake",
+            "environment": "live",
+            "market": "spot",
+            "time_ms": 1792594860000,
+            "balance_complete": true,
+            "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true},
+            "components": [
+              {"id": "cash", "asset": "KRW", "quantity": "10", "kind": "Cash", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+              {"id": "usdt", "asset": "USDT", "quantity": "2", "kind": "Holding", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}}
+            ]
+          }
+        ],
+        "quotes": [
+          {"base": "USDT", "quote": "KRW", "price": "1400", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+          {"base": "USDT", "quote": "KRW", "price": "1410", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}}
+        ],
+        "excluded_assets": []
+      },
+      "closing": {
+        "format": "keefi-valuation-bundle/1",
+        "as_of_ms": 1792595160000,
+        "connections": [
+          {"id": "FAKE_CONNECTION", "state": "complete", "environment": "live"}
+        ],
+        "snapshots": [
+          {
+            "id": "FAKE-full-1792595160000",
+            "account_scope": "FAKE_SCOPE",
+            "connection_id": "FAKE_CONNECTION",
+            "connection_binding": "FAKE_BINDING",
+            "provider": "fake",
+            "environment": "live",
+            "market": "spot",
+            "time_ms": 1792595160000,
+            "balance_complete": true,
+            "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true},
+            "components": [
+              {"id": "cash", "asset": "KRW", "quantity": "10", "kind": "Cash", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}},
+              {"id": "usdt", "asset": "USDT", "quantity": "3", "kind": "Holding", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}}
+            ]
+          }
+        ],
+        "quotes": [
+          {"base": "USDT", "quote": "KRW", "price": "1400", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+          {"base": "USDT", "quote": "KRW", "price": "1410", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}}
+        ],
+        "excluded_assets": []
+      },
+      "expected": {"available": true, "complete": true, "baseline_time_ms": 1792594860000, "opening_value": "2810", "closing_value": "4240", "difference": "1430"}
+    },
+    {
+      "name": "partial",
+      "opening": {
+        "format": "keefi-valuation-bundle/1",
+        "as_of_ms": 1792594860000,
+        "connections": [
+          {"id": "FAKE_CONNECTION", "state": "complete", "environment": "live"}
+        ],
+        "snapshots": [
+          {
+            "id": "FAKE-partial-1792594860000",
+            "account_scope": "FAKE_SCOPE",
+            "connection_id": "FAKE_CONNECTION",
+            "connection_binding": "FAKE_BINDING",
+            "provider": "fake",
+            "environment": "live",
+            "market": "spot",
+            "time_ms": 1792594860000,
+            "balance_complete": true,
+            "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true},
+            "components": [
+              {"id": "cash", "asset": "KRW", "quantity": "10", "kind": "Cash", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+              {"id": "usdt", "asset": "USDT", "quantity": "2", "kind": "Holding", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+              {"id": "other", "asset": "FAKE_UNKNOWN", "quantity": "7", "kind": "Holding", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}}
+            ]
+          }
+        ],
+        "quotes": [
+          {"base": "USDT", "quote": "KRW", "price": "1400", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+          {"base": "USDT", "quote": "KRW", "price": "1410", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}}
+        ],
+        "excluded_assets": []
+      },
+      "closing": {
+        "format": "keefi-valuation-bundle/1",
+        "as_of_ms": 1792595160000,
+        "connections": [
+          {"id": "FAKE_CONNECTION", "state": "complete", "environment": "live"}
+        ],
+        "snapshots": [
+          {
+            "id": "FAKE-partial-1792595160000",
+            "account_scope": "FAKE_SCOPE",
+            "connection_id": "FAKE_CONNECTION",
+            "connection_binding": "FAKE_BINDING",
+            "provider": "fake",
+            "environment": "live",
+            "market": "spot",
+            "time_ms": 1792595160000,
+            "balance_complete": true,
+            "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true},
+            "components": [
+              {"id": "cash", "asset": "KRW", "quantity": "10", "kind": "Cash", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}},
+              {"id": "usdt", "asset": "USDT", "quantity": "3", "kind": "Holding", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}},
+              {"id": "other", "asset": "FAKE_UNKNOWN", "quantity": "7", "kind": "Holding", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}}
+            ]
+          }
+        ],
+        "quotes": [
+          {"base": "USDT", "quote": "KRW", "price": "1400", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+          {"base": "USDT", "quote": "KRW", "price": "1410", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}}
+        ],
+        "excluded_assets": []
+      },
+      "expected": {"available": true, "complete": false, "baseline_time_ms": 1792594860000, "opening_value": "2810", "closing_value": "4240", "difference": "1430"}
+    },
+    {
+      "name": "excluded",
+      "opening": {
+        "format": "keefi-valuation-bundle/1",
+        "as_of_ms": 1792594860000,
+        "connections": [
+          {"id": "FAKE_CONNECTION", "state": "complete", "environment": "live"}
+        ],
+        "snapshots": [
+          {
+            "id": "FAKE-excluded-1792594860000",
+            "account_scope": "FAKE_SCOPE",
+            "connection_id": "FAKE_CONNECTION",
+            "connection_binding": "FAKE_BINDING",
+            "provider": "fake",
+            "environment": "live",
+            "market": "spot",
+            "time_ms": 1792594860000,
+            "balance_complete": true,
+            "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true},
+            "components": [
+              {"id": "cash", "asset": "KRW", "quantity": "10", "kind": "Cash", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+              {"id": "usdt", "asset": "USDT", "quantity": "2", "kind": "Holding", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+              {"id": "other", "asset": "solana:So11111111111111111111111111111111111111112", "quantity": "7", "kind": "Holding", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}}
+            ]
+          }
+        ],
+        "quotes": [
+          {"base": "USDT", "quote": "KRW", "price": "1400", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+          {"base": "USDT", "quote": "KRW", "price": "1410", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}}
+        ],
+        "excluded_assets": ["solana:So11111111111111111111111111111111111111112"]
+      },
+      "closing": {
+        "format": "keefi-valuation-bundle/1",
+        "as_of_ms": 1792595160000,
+        "connections": [
+          {"id": "FAKE_CONNECTION", "state": "complete", "environment": "live"}
+        ],
+        "snapshots": [
+          {
+            "id": "FAKE-excluded-1792595160000",
+            "account_scope": "FAKE_SCOPE",
+            "connection_id": "FAKE_CONNECTION",
+            "connection_binding": "FAKE_BINDING",
+            "provider": "fake",
+            "environment": "live",
+            "market": "spot",
+            "time_ms": 1792595160000,
+            "balance_complete": true,
+            "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true},
+            "components": [
+              {"id": "cash", "asset": "KRW", "quantity": "10", "kind": "Cash", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}},
+              {"id": "usdt", "asset": "USDT", "quantity": "3", "kind": "Holding", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}},
+              {"id": "other", "asset": "solana:So11111111111111111111111111111111111111112", "quantity": "7", "kind": "Holding", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}}
+            ]
+          }
+        ],
+        "quotes": [
+          {"base": "USDT", "quote": "KRW", "price": "1400", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+          {"base": "USDT", "quote": "KRW", "price": "1410", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}}
+        ],
+        "excluded_assets": ["solana:So11111111111111111111111111111111111111112"]
+      },
+      "expected": {"available": true, "complete": true, "baseline_time_ms": 1792594860000, "opening_value": "2810", "closing_value": "4240", "difference": "1430"}
+    },
+    {
+      "name": "futures",
+      "opening": {
+        "format": "keefi-valuation-bundle/1",
+        "as_of_ms": 1792594860000,
+        "connections": [
+          {"id": "FAKE_CONNECTION", "state": "complete", "environment": "live"}
+        ],
+        "snapshots": [
+          {
+            "id": "FAKE-futures-1792594860000",
+            "account_scope": "FAKE_SCOPE",
+            "connection_id": "FAKE_CONNECTION",
+            "connection_binding": "FAKE_BINDING",
+            "provider": "fake",
+            "environment": "live",
+            "market": "usdm_futures",
+            "time_ms": 1792594860000,
+            "balance_complete": true,
+            "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true},
+            "components": [
+              {"id": "cash", "asset": "KRW", "quantity": "10", "kind": "Cash", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+              {"id": "usdt", "asset": "USDT", "quantity": "12", "kind": "Equity", "valuation_group": "futures", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+              {"id": "wallet-detail", "asset": "USDT", "quantity": "12", "kind": "Cash", "valuation_group": "futures", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+              {"id": "position", "asset": "USDT", "quantity": "999", "kind": "PositionNotional", "valuation_group": "futures", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}}
+            ]
+          }
+        ],
+        "quotes": [
+          {"base": "USDT", "quote": "KRW", "price": "1400", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+          {"base": "USDT", "quote": "KRW", "price": "1410", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}}
+        ],
+        "excluded_assets": []
+      },
+      "closing": {
+        "format": "keefi-valuation-bundle/1",
+        "as_of_ms": 1792595160000,
+        "connections": [
+          {"id": "FAKE_CONNECTION", "state": "complete", "environment": "live"}
+        ],
+        "snapshots": [
+          {
+            "id": "FAKE-futures-1792595160000",
+            "account_scope": "FAKE_SCOPE",
+            "connection_id": "FAKE_CONNECTION",
+            "connection_binding": "FAKE_BINDING",
+            "provider": "fake",
+            "environment": "live",
+            "market": "usdm_futures",
+            "time_ms": 1792595160000,
+            "balance_complete": true,
+            "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true},
+            "components": [
+              {"id": "cash", "asset": "KRW", "quantity": "10", "kind": "Cash", "valuation_group": "spot", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}},
+              {"id": "usdt", "asset": "USDT", "quantity": "13", "kind": "Equity", "valuation_group": "futures", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}},
+              {"id": "wallet-detail", "asset": "USDT", "quantity": "13", "kind": "Cash", "valuation_group": "futures", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}},
+              {"id": "position", "asset": "USDT", "quantity": "999", "kind": "PositionNotional", "valuation_group": "futures", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "FAKE_SCOPE", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}}
+            ]
+          }
+        ],
+        "quotes": [
+          {"base": "USDT", "quote": "KRW", "price": "1400", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792594860000, "received_at_ms": 1792594860000, "complete": true}},
+          {"base": "USDT", "quote": "KRW", "price": "1410", "venue": "upbit", "evidence": {"source": "FAKE_OFFICIAL_SOURCE", "url": "https://example.invalid/official", "scope": "public:upbit:KRW-USDT", "source_time_ms": 1792595160000, "received_at_ms": 1792595160000, "complete": true}}
+        ],
+        "excluded_assets": []
+      },
+      "expected": {"available": true, "complete": true, "baseline_time_ms": 1792594860000, "opening_value": "16810", "closing_value": "18340", "difference": "1530"}
+    }
+  ]
+}

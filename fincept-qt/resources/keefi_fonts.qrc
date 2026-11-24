@@ -1,0 +1,12 @@
+<RCC>
+  <qresource prefix="/keefi/fonts">
+    <file alias="Pretendard-Regular.otf">keefi/fonts/Pretendard-Regular.otf</file>
+    <file alias="Pretendard-Medium.otf">keefi/fonts/Pretendard-Medium.otf</file>
+    <file alias="Pretendard-SemiBold.otf">keefi/fonts/Pretendard-SemiBold.otf</file>
+    <file alias="Pretendard-Bold.otf">keefi/fonts/Pretendard-Bold.otf</file>
+    <file alias="Pretendard-ExtraBold.otf">keefi/fonts/Pretendard-ExtraBold.otf</file>
+    <file alias="DepartureMono-Regular.otf">keefi/fonts/DepartureMono-Regular.otf</file>
+    <file alias="pretendard-OFL.txt">../../docs/keefi/licenses/pretendard-1.3.9-OFL.txt</file>
+    <file alias="departure-mono-OFL.txt">../../docs/keefi/licenses/departure-mono-1.500-OFL.txt</file>
+  </qresource>
+</RCC>

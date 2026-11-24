@@ -1,0 +1,32 @@
+name: Windows test candidate
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-2022
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - name: Build and test the Windows x64 ZIP
+        shell: pwsh
+        run: ./scripts/keefi/build-windows-candidate.ps1 -WorkDir "$env:RUNNER_TEMP/keefi"
+      - name: Upload synthetic test diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: keefi-windows-test-logs
+          path: ${{ runner.temp }}/keefi/build/packaging-*.txt
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Upload tested ZIP, checksum and verification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: keefi-windows-x64
+          path: ${{ runner.temp }}/keefi/dist/KEEFI-*
+          if-no-files-found: error
+          compression-level: 0

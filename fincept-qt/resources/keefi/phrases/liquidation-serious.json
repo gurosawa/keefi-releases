@@ -1,0 +1,6 @@
+{
+  "schema": "keefi-liquidation-phrase/1",
+  "id": "serious_liquidation",
+  "title": "KEEFI 청산 경고",
+  "text": "청산 위험: {sym} {side} 포지션이 청산가까지 {dist}% 남았습니다({source} 마크 가격, {observedAt} 기준)."
+}

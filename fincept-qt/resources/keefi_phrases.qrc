@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="/keefi/phrases">
+    <file alias="plain.json">keefi/phrases/plain.json</file>
+    <file alias="drip.json">keefi/phrases/drip.json</file>
+    <file alias="liquidation-serious.json">keefi/phrases/liquidation-serious.json</file>
+  </qresource>
+</RCC>

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="바이낸스에서 조회용 HMAC 키를 발급해 KEEFI에서 선택한 시장의 잔고를 확인하세요.">
+  <title>바이낸스 연결 · KEEFI</title>
+  <link rel="stylesheet" href="/guide.css">
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="topbar">
+    <div class="frame bar-inner"><a class="brand" href="/" aria-label="KEEFI 연결 가이드 홈">KEEFI</a><span class="bar-rule"></span><a class="bar-name" href="/">연결 가이드</a></div>
+  </header>
+  <main class="frame guide" id="main">
+    <nav class="crumb" aria-label="현재 위치"><a href="/">전체 가이드</a><span aria-hidden="true">/</span><span>바이낸스</span></nav>
+    <div class="hero">
+      <div class="hero-copy"><p class="eyebrow">현물·USDⓈ-M 선물</p><h1>바이낸스 연결</h1><p class="intro">바이낸스에서 조회용 HMAC 키를 발급해 KEEFI에서 선택한 시장의 잔고를 확인하세요.</p>
+        <a href="https://www.binance.com/en/my/settings/api-management" class="issue-link" rel="noopener noreferrer" target="_blank">바이낸스 API 관리 열기 <span class="arrow" aria-hidden="true">↗</span><span class="sr"> (새 탭)</span></a>
+      </div>
+      <section class="mapping" aria-label="발급받은 키와 KEEFI 입력칸 대응표">
+        <h2>발급받은 키와 입력칸</h2>
+        <table><thead><tr><th scope="col">바이낸스 발급 화면</th><th scope="col">KEEFI 입력칸</th></tr></thead><tbody>
+            <tr><td>API Key</td><td>API Key</td></tr>
+            <tr><td>Secret Key</td><td>Secret</td></tr>
+          </tbody></table>
+      </section>
+    </div>
+    <div class="content">
+      <nav class="contents" aria-label="페이지 안에서 이동"><strong>이 가이드에서</strong><a href="#steps">연결 순서</a><a href="#questions">자주 막히는 곳</a><a href="#official">공식 안내</a></nav>
+      <div class="article">
+        <section id="steps"><h2>연결 순서</h2><ol class="steps">
+          <li><h3>API Management 열기</h3><p>바이낸스에 로그인해 <strong>API Management → Create API</strong>를 선택하세요. 발급 화면에서 계정 인증 관련 안내가 나오면 바이낸스에서 먼저 완료하세요.</p></li>
+          <li><h3>System-generated 키 선택</h3><p>키 유형은 <strong>System-generated</strong>를 선택하세요. 이 방식은 HMAC 키와 Secret을 발급합니다. 구분할 이름을 입력하고 바이낸스의 본인 인증을 마칩니다.</p></li>
+          <li><h3>조회 권한과 연결할 시장 확인</h3><p>발급한 키의 <strong>Enable Reading</strong> 권한을 확인하세요. KEEFI 잔고 조회에는 주문·출금 권한을 켤 필요가 없습니다. KEEFI에서 현물 또는 USDⓈ-M 선물 중 조회할 시장을 선택합니다.</p></li>
+          <li><h3>KEEFI에서 키 입력</h3><p>KEEFI의 <strong>Binance</strong> 연결 창으로 돌아오세요. API Key와 Secret을 각각 넣고 <strong>저장하고 연결</strong>을 누른 뒤 선택한 시장의 조회 결과를 확인하세요.</p></li>
+        </ol></section>
+        <section id="questions"><h2>자주 막히는 곳</h2>
+          <details><summary>키 형식 오류가 떠요</summary><p>KEEFI는 System-generated HMAC 키를 지원합니다. 바이낸스 API 관리에서 발급한 키 유형을 확인하세요.</p></details>
+          <details><summary>현물과 선물을 함께 보고 싶어요</summary><p>KEEFI에서 다른 시장 연결을 추가하고 기존에 저장한 동일 키를 선택할 수 있습니다. 조회할 시장의 바이낸스 계정이 활성화돼 있는지도 확인하세요.</p></details>
+        </section>
+        <section id="official" class="official"><h2>공식 안내</h2><a href="https://www.binance.com/en/support/faq/detail/360002502072" rel="noopener noreferrer" target="_blank">바이낸스 공식 발급 안내 <span class="arrow" aria-hidden="true">↗</span><span class="sr"> (새 탭)</span></a></section>
+      </div>
+    </div>
+  </main>
+  <footer><div class="frame footer-inner"><strong>KEEFI</strong><span>API 키는 KEEFI 앱의 로컬 금고에 저장합니다.</span></div></footer>
+</body>
+</html>

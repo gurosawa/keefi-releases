@@ -1,0 +1,36 @@
+{
+  "schema": "keefi-chart-phrases/1",
+  "language": "ko-KR",
+  "id": "keefi_drip_dc",
+  "name": "KEEFI 차갤·비갤 드립 팩",
+  "templates": {
+    "pullback": [
+      {"id":"drip_pb_a","text":"{sym} {tf} 눌림목 점수 {score}점 찍힘. 캔들 {n}개 마감 기준임."},
+      {"id":"drip_pb_b","text":"{sym} {tf} 눌림존 입갤함. 점수는 {score}점이고 캔들 {n}개 돌려본 거임."}
+    ],
+    "result_up": [
+      {"id":"drip_up_a","text":"{sym} {tf} 시그널 뜨고 {horizon} 뒤에 {ret}% 쐈네. 수수료 안 뺀 {n}번 스탯임."},
+      {"id":"drip_up_b","text":"{sym} {tf} 시그널 {horizon} 동안 보니까 {ret}% 양전함. 수수료 안 떼고 {n}번 돌려봄."}
+    ],
+    "result_down": [
+      {"id":"drip_down_a","text":"{sym} {tf} 시그널 뜨고 {horizon} 뒤에 {ret}% 처박음. 수수료 안 뺀 {n}번 스탯임."},
+      {"id":"drip_down_b","text":"{sym} {tf} 시그널 {horizon} 동안 보니까 {ret}% 흘렀네. 수수료 안 떼고 {n}번 돌려봄."}
+    ],
+    "result_flat": [
+      {"id":"drip_flat_a","text":"{sym} {tf} 시그널 뒤 {horizon} 지났는데 {ret}%로 무한 횡보 중. 수수료 안 빼고 {n}번 본 거임."},
+      {"id":"drip_flat_b","text":"{sym} {tf} 시그널 {horizon} 동안 봤는데 {ret}%로 개노잼 무빙임. 수수료 안 빼고 {n}번 돌려봄."}
+    ],
+    "notice": [
+      {"id":"drip_notice_a","text":"{source}에 {sym} 오피셜 공지 {n}개 뜸."},
+      {"id":"drip_notice_b","text":"{source}발 {sym} 오피셜 공지 {n}개 올라옴."}
+    ],
+    "line": [
+      {"id":"drip_line_a","text":"{sym} {tf} 캔들이 {price} {currency} 라인 터치함. 인접한 완료 봉 {n}개로 확인한 거임."},
+      {"id":"drip_line_b","text":"{sym} {tf} {price} {currency} 라인 찍음. 인접한 완료 봉 {n}개 비교한 거임."}
+    ],
+    "whale": [
+      {"id":"drip_whale_a","text":"{sym} {tf}에서 고래 행님들 {signal} 무빙 포착됨. 유효 관측 표본 {n}개 기준임."},
+      {"id":"drip_whale_b","text":"{sym} {tf}에 {signal} 뜸. 유효 관측 표본 {n}개로 본 거임."}
+    ]
+  }
+}

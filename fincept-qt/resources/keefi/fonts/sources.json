@@ -1,0 +1,92 @@
+{
+  "checked_on": "2026-10-23",
+  "official_release_pages": [
+    "https://github.com/orioncactus/pretendard/releases/tag/v1.3.9",
+    "https://github.com/rektdeckard/departure-mono/releases/tag/v1.500"
+  ],
+  "archives": [
+    {
+      "name": "Pretendard-1.3.9.zip",
+      "download_url": "https://github.com/orioncactus/pretendard/releases/download/v1.3.9/Pretendard-1.3.9.zip",
+      "bytes": 47304526,
+      "sha256": "04be351a74d6bf7d60c480a3087e51d185485d35a52023142af1df19eb8c428a"
+    },
+    {
+      "name": "DepartureMono-1.500.zip",
+      "download_url": "https://github.com/rektdeckard/departure-mono/releases/download/v1.500/DepartureMono-1.500.zip",
+      "bytes": 82890,
+      "sha256": "bf3e48059aeef4617ec585bdea81dcc3491c576b3e7a472f52faf40e09ee5c3a"
+    }
+  ],
+  "files": [
+    {
+      "name": "Pretendard-LICENSE.txt",
+      "archive": "Pretendard-1.3.9.zip",
+      "archive_member": "LICENSE.txt",
+      "download_url": "https://github.com/orioncactus/pretendard/releases/download/v1.3.9/Pretendard-1.3.9.zip",
+      "bytes": 4419,
+      "sha256": "b04538c9abec39a3db75108cf0af0fd9c77032fe8aa2cf38345b4d250e98e38e"
+    },
+    {
+      "name": "DepartureMono-Regular.otf",
+      "archive": "DepartureMono-1.500.zip",
+      "archive_member": "DepartureMono-1.500/DepartureMono-Regular.otf",
+      "download_url": "https://github.com/rektdeckard/departure-mono/releases/download/v1.500/DepartureMono-1.500.zip",
+      "bytes": 84480,
+      "sha256": "4d53f663155cf8bf7ffc8e688776e719625f7bbb80a8d90073438b249261a2e0"
+    },
+    {
+      "name": "DepartureMono-LICENSE.txt",
+      "archive": "DepartureMono-1.500.zip",
+      "archive_member": "DepartureMono-1.500/LICENSE",
+      "download_url": "https://github.com/rektdeckard/departure-mono/releases/download/v1.500/DepartureMono-1.500.zip",
+      "bytes": 4357,
+      "sha256": "b65e42750f3cb65437a97f4dfd781c58f199259949db2341012be60e32500e83"
+    },
+    {
+      "name": "Pretendard-Regular.otf",
+      "archive": "Pretendard-1.3.9.zip",
+      "archive_member": "public/static/Pretendard-Regular.otf",
+      "download_url": "https://github.com/orioncactus/pretendard/releases/download/v1.3.9/Pretendard-1.3.9.zip",
+      "bytes": 1574352,
+      "sha256": "3ffbacde6ab8411f1d2db54bb9b1f0b3ee2a738932033722cf0388c06aed1c93"
+    },
+    {
+      "name": "Pretendard-Medium.otf",
+      "archive": "Pretendard-1.3.9.zip",
+      "archive_member": "public/static/Pretendard-Medium.otf",
+      "download_url": "https://github.com/orioncactus/pretendard/releases/download/v1.3.9/Pretendard-1.3.9.zip",
+      "bytes": 1584068,
+      "sha256": "d39e50e4bb52b4993b6a4eeb821a171254745bd824446af01e1f616b89fface0"
+    },
+    {
+      "name": "Pretendard-SemiBold.otf",
+      "archive": "Pretendard-1.3.9.zip",
+      "archive_member": "public/static/Pretendard-SemiBold.otf",
+      "download_url": "https://github.com/orioncactus/pretendard/releases/download/v1.3.9/Pretendard-1.3.9.zip",
+      "bytes": 1583704,
+      "sha256": "c89bc43027dc7cde5726e96223376f8eec09302b2fc1f8147fd5b57cfc376118"
+    },
+    {
+      "name": "Pretendard-Bold.otf",
+      "archive": "Pretendard-1.3.9.zip",
+      "archive_member": "public/static/Pretendard-Bold.otf",
+      "download_url": "https://github.com/orioncactus/pretendard/releases/download/v1.3.9/Pretendard-1.3.9.zip",
+      "bytes": 1576660,
+      "sha256": "2e91915fab54df71cc9598ebf608b2bdb54c6fe3c066ac61dff0bc44fca71cc7"
+    },
+    {
+      "name": "Pretendard-ExtraBold.otf",
+      "archive": "Pretendard-1.3.9.zip",
+      "archive_member": "public/static/Pretendard-ExtraBold.otf",
+      "download_url": "https://github.com/orioncactus/pretendard/releases/download/v1.3.9/Pretendard-1.3.9.zip",
+      "bytes": 1568512,
+      "sha256": "c35fe941b7568d52a96010561540e47f9d3948dfde66ba25bc1908233e0a40cd"
+    }
+  ],
+  "mockup_reference_crosscheck": {
+    "departure_zip_sha256_matches_spec": true,
+    "departure_woff2_sha256": "5b4fed1daa90708aa9c6ee1190abca9dc22164a1c1def0020386e46b61038cfb",
+    "departure_woff2_matches_spec": true
+  }
+}

@@ -1,0 +1,5 @@
+# Shell scripts are portable LF text.
+*.sh text eol=lf
+
+# Local operating evidence is excluded from public source snapshots.
+ops-private/ export-ignore

@@ -1,0 +1,63 @@
+{
+  "qt": {
+    "version": "6.8.3",
+    "macos_arch": "clang_64",
+    "archives": [
+      "qtbase",
+      "qttools",
+      "qtwebsockets"
+    ],
+    "components": [
+      "Core",
+      "Gui",
+      "Widgets",
+      "Network",
+      "WebSockets",
+      "Test"
+    ],
+    "download_hash_lock_complete": true,
+    "source": "https://download.qt.io/online/qtsdkrepository/",
+    "downloads": [
+      {
+        "name": "qtbase",
+        "aqt_cache_filename": "qtbase-MacOS-MacOS_14-Clang-MacOS-MacOS_14-X86_64-ARM64.7z",
+        "url": "https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_683/qt6_683/qt.qt6.683.clang_64/6.8.3-0-202503201723qtbase-MacOS-MacOS_14-Clang-MacOS-MacOS_14-X86_64-ARM64.7z",
+        "sha256": "c4dfc40f1be702eaa08e08cf87a749c44c55e5eb09e46a7933f18ab4b7ca7ac7",
+        "checksum_source": "https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_683/qt6_683/qt.qt6.683.clang_64/6.8.3-0-202503201723qtbase-MacOS-MacOS_14-Clang-MacOS-MacOS_14-X86_64-ARM64.7z.sha256"
+      },
+      {
+        "name": "qttools",
+        "aqt_cache_filename": "qttools-MacOS-MacOS_14-Clang-MacOS-MacOS_14-X86_64-ARM64.7z",
+        "url": "https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_683/qt6_683/qt.qt6.683.clang_64/6.8.3-0-202503201723qttools-MacOS-MacOS_14-Clang-MacOS-MacOS_14-X86_64-ARM64.7z",
+        "sha256": "ee98096c12c8a4026a550182fdd37d8546ec780c1a60a1a5b5d60d216e53a445",
+        "checksum_source": "https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_683/qt6_683/qt.qt6.683.clang_64/6.8.3-0-202503201723qttools-MacOS-MacOS_14-Clang-MacOS-MacOS_14-X86_64-ARM64.7z.sha256"
+      },
+      {
+        "name": "qtwebsockets",
+        "aqt_cache_filename": "qtwebsockets-MacOS-MacOS_14-Clang-MacOS-MacOS_14-X86_64-ARM64.7z",
+        "url": "https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_683/qt6_683/qt.qt6.683.addons.qtwebsockets.clang_64/6.8.3-0-202503201723qtwebsockets-MacOS-MacOS_14-Clang-MacOS-MacOS_14-X86_64-ARM64.7z",
+        "sha256": "d4d903cd291f3ac2c2c4bb0a515900c0567e8e6e9dffbe24a188518cd294e2d7",
+        "checksum_source": "https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_683/qt6_683/qt.qt6.683.addons.qtwebsockets.clang_64/6.8.3-0-202503201723qtwebsockets-MacOS-MacOS_14-Clang-MacOS-MacOS_14-X86_64-ARM64.7z.sha256"
+      }
+    ],
+    "checksum_verified_on": "2026-10-18",
+    "aqt_base_archives": [
+      "qtbase",
+      "qttools"
+    ],
+    "aqt_modules": [
+      "qtwebsockets"
+    ]
+  },
+  "libsodium": {
+    "version": "1.0.22",
+    "url": "https://github.com/jedisct1/libsodium/releases/download/1.0.22-RELEASE/libsodium-1.0.22.tar.gz",
+    "sha256": "adbdd8f16149e81ac6078a03aca6fc03b592b89ef7b5ed83841c086191be3349"
+  },
+  "build_tools": {
+    "aqtinstall": "3.3.0",
+    "cmake": "3.31.6",
+    "ninja": "1.11.1.4"
+  },
+  "hash_lock_scope": "Qt SDK archives and libsodium source only; Python/CLT and transitive pip tools are not a fully locked toolchain"
+}

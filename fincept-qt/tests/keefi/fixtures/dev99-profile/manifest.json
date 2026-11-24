@@ -1,0 +1,23 @@
+{
+    "artifact": "Dev99 synthetic legacy vault",
+    "bytes": 760,
+    "currency": "KRW",
+    "environment": "live",
+    "file": "credentials.finix-vault",
+    "generatedUtc": "2026-11-13T09:48:47.568Z",
+    "generatorCompiler": "17.0.0 (clang-1700.6.3.2)",
+    "hasLedgerKey": true,
+    "market": "spot",
+    "noNetworkObjectsOrRequests": true,
+    "oldLibrary": "libfinix_vault.a",
+    "oldLibrarySha256": "5fc35dac2224dd99e03e7831c727852b56ea1c14862a994d9e68f824c1a08340",
+    "oldVaultSourceSha256": "f4eb62c8108633e80415e9dd0675bfc7abbeaff9a3c794e34478c63effe8530e",
+    "provider": "upbit",
+    "qtVersion": "6.8.3",
+    "sha256": "2e136e637980c02d9e3499b32452344faa2b722494e44a6ebf68eb24d01e85e6",
+    "sourceCommit": "cef32c29c709b0f127c4fa118ef7e9617dcd5d05",
+    "sourceUnchangedAfterReopen": true,
+    "syntheticAccountId": "00000000-0000-4000-8000-000000000099",
+    "syntheticAlias": "DEV99_SYNTHETIC_ACCOUNT_NOT_REAL",
+    "syntheticPassword": "FINIX synthetic Dev99 password 2026!"
+}

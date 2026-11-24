@@ -13,7 +13,7 @@ on run argv
     set adminMode to item 8 of argv is "admin"
     set options to ""
     if (count argv) is 11 then set options to " --args --profile-dir " & quoted form of (item 11 of argv)
-    set reopen to "/usr/bin/open -n " & quoted form of targetApp & options
+    set reopenCommand to "/usr/bin/open -n " & quoted form of targetApp & options
     -- Let the app close its vault and release all profile and IPC locks.
     repeat 600 times
         try
@@ -42,7 +42,7 @@ on run argv
         end if
     on error details number reason
         try
-            do shell script reopen
+            do shell script reopenCommand
         end try
         if reason is not -128 then display dialog "업데이트를 완료하지 못했습니다." & return & details buttons {"확인"} default button 1 giving up after 30
     end try

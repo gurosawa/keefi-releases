@@ -115,6 +115,10 @@ def verify():
             reports, failed = smoke(app, test, data["version"])
             if failed:
                 raise RuntimeError(f"Clean runner startup failed: {failed}")
+    with without_local_dumps():
+        run_update = runpy.run_path(str(ROOT / ".github/scripts/verify-windows-update.py"))["verify"]
+        data["update_install"] = run_update(work, archive, data)
+        print("Verified Windows update, tamper refusal, rollback and retained encrypted accounts", flush=True)
     data["hosted_wer_policy_check"] = {"dump_enabled_refusal": expected, "normal_startups": reports,
                                        "runner_policy_restored": True}
     receipt.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

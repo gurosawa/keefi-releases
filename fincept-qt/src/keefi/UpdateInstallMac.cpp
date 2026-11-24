@@ -20,7 +20,7 @@ bool startUpdateInstaller(const QString& archive, const QByteArray& sha256Hex, c
         return fail(QStringLiteral("설치된 KEEFI.app에서 업데이트를 실행해 주세요."));
     const auto bundle = binary.left(binary.size() - QStringLiteral("/Contents/MacOS/KEEFI").size());
     const auto parent = QFileInfo(bundle).absolutePath();
-    if (parent.startsWith(QStringLiteral("/Volumes/")) || parent.contains(QStringLiteral("/AppTranslocation/")))
+    if (parent.contains(QStringLiteral("/AppTranslocation/")))
         return fail(QStringLiteral("KEEFI.app을 응용 프로그램 폴더로 옮긴 후 다시 실행해 주세요."));
     const bool writable = ::access(QFile::encodeName(parent).constData(), W_OK) == 0;
     if (!writable && bundle != QStringLiteral("/Applications/KEEFI.app"))

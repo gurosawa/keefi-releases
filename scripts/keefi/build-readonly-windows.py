@@ -16,7 +16,7 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SUITES = ("kiwoom", "kiwoom_trading", "retired_connections", "connection_form", "local_window", "profile_upgrade")
+SUITES = ("kiwoom", "kiwoom_trading", "retired_connections", "connection_form", "local_window", "profile_upgrade", "release_update")
 FORM_CASES = ("kiwoomFilePairIsValidatedBeforeUpdatingEitherField",
               "suspendedBrokersRejectNewAndExistingCredentials", "stockChartChooserUsesLiveBrokersAndReturnsToChart")
 WINDOW_CASES = ("brokerConnectionReturnsToOrigin", "suspendedBrokersKeepOnlyRemovalAction")
@@ -186,7 +186,7 @@ def build_package(args):
     targets = ["KEEFI", "KEEFIUpdate"]
     if not args.stage_only:
         targets.extend(f"tst_keefi_{suite}" for suite in SUITES)
-        targets.extend(("keefi_update_profile_probe", "keefi_update_probe", "tst_keefi_release_update"))
+        targets.extend(("keefi_update_profile_probe", "keefi_update_probe"))
     subprocess.run([cmake, "--build", build, "--parallel", str(args.jobs), "--target", *targets], env=env, check=True)
     tests, failures = ({}, []) if args.stage_only else isolated_tests(build, env, qt / "plugins")
     binary = build / "KEEFI.exe"

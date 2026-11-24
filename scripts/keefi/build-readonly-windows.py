@@ -102,27 +102,48 @@ def run_tests(build, env):
                 "profile_upgrade": ("emptyStateCreatesOnlyTheNewIdentity",)}
     results = {}
     failures = []
-    for suite in SUITES:
-        # QTest's Windows GUI backend exercises the native platform through the same public entry points.
+    # The hosted Hyper-V desktop caps top-level HWNDs at about 1028x749. Keep
+    # the 1440px assertions on a full-size Qt test screen, plus real HWND
+    # interactions that fit the runner. The packaged executable and updater
+    # smoke tests always run with the Windows platform plugin.
+    wide_suites = {"chart_side_panel", "market_candles_view", "chart_market_context"}
+    screen = build / "packaging-qt-screen.json"
+    screen.write_text(json.dumps({"screens": [{"name": "Release QA", "x": 0, "y": 0,
+                                               "width": 1920, "height": 1080, "logicalDpi": 96,
+                                               "dpr": 1.0}]}), encoding="utf-8")
+    offscreen = "offscreen:configfile=" + screen.name
+    runs = [(suite, selected.get(suite, ()), offscreen if suite in wide_suites else "windows")
+            for suite in SUITES]
+    runs.extend([
+        ("chart_side_panel", ("panelKeepsBothFloorsAtCommonWidths:960",), "windows"),
+        ("market_candles_view", ("gappedAutoTrendUsesTheSameObservedPathForPreviewApplyAndHit",
+                                 "controlModifierStrongMagnetSnapsWithin24PxWithoutFocusSteal",
+                                 "autoPreviewApplyBatchesSingleUndoReplacesAndRespectsCheckboxes",
+                                 "objectsPanelEyeLockDeleteInPlaceUpdateAndFocusPreservation"), "windows"),
+    ])
+    for suite, cases, platform in runs:
+        label = f"{suite}_{platform.split(':')[0]}" if suite in wide_suites else suite
         exe = build / "tests" / "keefi" / f"tst_keefi_{suite}.exe"
-        log = build / f"packaging-{suite}.txt"
+        log = build / f"packaging-{label}.txt"
         log.unlink(missing_ok=True)
         try:
-            code = subprocess.run([exe, *selected.get(suite, ()), "-o", f"{log},txt"], env=env, timeout=480).returncode
+            # A relative configfile avoids interpreting the colon in a Windows drive letter as a QPA option.
+            code = subprocess.run([exe, *cases, "-o", f"{log},txt"], cwd=build,
+                                  env={**env, "QT_QPA_PLATFORM": platform}, timeout=480).returncode
         except (OSError, subprocess.TimeoutExpired) as error:
             code = None
-            print(f"{suite}: {error}", flush=True)
+            print(f"{label}: {error}", flush=True)
         output = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
         totals = re.search(r"Totals:\s*(\d+) passed,\s*(\d+) failed,\s*(\d+) skipped,\s*(\d+) blacklisted", output)
         if not (code == 0 and totals and int(totals[1]) > 2 and totals.groups()[1:] == ("0", "0", "0")):
             for line in output.splitlines():
                 if line.lstrip().startswith(("FAIL!", "QFATAL", "SKIP", "XPASS", "Loc:", "Totals:")):
                     print(line, flush=True)
-            failures.append(suite)
-            print(f"Native {suite} tests failed (exit {code}); see {log}", flush=True)
+            failures.append(label)
+            print(f"Windows {label} tests failed (exit {code}); see {log}", flush=True)
             continue
-        print(f"{suite}: {totals[0]}", flush=True)
-        results[suite] = int(totals[1])
+        print(f"{label}: {totals[0]}", flush=True)
+        results[label] = int(totals[1])
     return results, failures
 
 

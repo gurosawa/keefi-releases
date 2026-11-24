@@ -1109,7 +1109,9 @@ void CandleChart::paintLegend(QPainter& p,const QRectF& area,const std::optional
         if(found!=rows_.cend()&&found!=rows_.cbegin())previous=std::prev(found)->close.toDouble();
         if(!previous&&!rows_.isEmpty()&&forming_&&candle->startsAtMs==forming_->startsAtMs)previous=rows_.last().close.toDouble();
         // Values in the body text colour; only the change is coloured, slightly lighter than candle ink.
-        auto change=MovementColorPolicy::colorFor(this,movementForSign(close>open?1:close<open?-1:0));change.setAlphaF(.95);
+        // An opaque ink keeps Windows glyphs identical on dirty strips and a complete backing-store repaint.
+        const auto direction=movementForSign(close>open?1:close<open?-1:0);
+        const auto change=KeefiTheme::blend(MovementColorPolicy::colorFor(this,direction),themeColors().bg,.95);
         QList<QPair<QString,QString>> parts{{tr("시"),priceAmount(candle->open)},{tr("고"),priceAmount(candle->high)},{tr("저"),priceAmount(candle->low)},{tr("종"),priceAmount(candle->close)}};
         if(previous&&*previous>0){const auto percent=(close/ *previous-1)*100;parts.append({QString{},(percent>0?"+":"")+QString::number(percent,'f',2)+"%"});}
         bool volumeOk=false;const auto volume=candle->volume.toDouble(&volumeOk);

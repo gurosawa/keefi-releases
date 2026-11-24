@@ -306,6 +306,20 @@ int update(int argc,wchar_t** argv) {
     } catch(const Error& e){status=e.code;}
       catch(...){status=19;}
     if(status!=21) removeStage(staging);
+    // The downloader transfers ownership of only one uniquely named ZIP.
+    // Remove the directory only if empty; never recurse over the user's TEMP.
+    if(closed) {
+        CloseHandle(zip.h); zip.h=nullptr;
+        std::error_code ec;
+        const auto parentDir=archive.parent_path();
+        const auto n=parentDir.filename().wstring();
+        const Str expectedName=L"KEEFI-"+Str(argv[6])+L"-"+Str(argv[7])+L"-windows-x64.zip";
+        const auto temp=fs::temp_directory_path(ec);
+        if (!ec && same(archive.filename(),expectedName) && n.starts_with(L"KEEFI-update-") &&
+            n.size()==Str(L"KEEFI-update-").size()+6 && fs::equivalent(temp,parentDir.parent_path(),ec) && !ec) {
+            DeleteFileW(archive.c_str()); RemoveDirectoryW(parentDir.c_str());
+        }
+    }
     if(closed && status) {
         if(status!=21) {try { startInstalled(exe,profile); } catch(...) {}}
         MessageBoxW(nullptr,status==21 ? L"업데이트를 복구하지 못했습니다. 앱 옆 .keefi-update 폴더에 이전 파일을 보관했습니다."

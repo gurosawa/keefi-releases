@@ -22,6 +22,9 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 12
     steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
       - name: Verify the public download using the built-in release key
         shell: pwsh
         env:
@@ -40,11 +43,14 @@ jobs:
           $work = Join-Path $env:RUNNER_TEMP 'keefi-public-update'
           gh run download $env:BUILD_RUN --repo $env:GITHUB_REPOSITORY --name keefi-windows-x64 --dir "$work/dist"
           gh run download $env:BUILD_RUN --repo $env:GITHUB_REPOSITORY --name keefi-windows-update-probe --dir "$work/probe"
+          gh run download $env:BUILD_RUN --repo $env:GITHUB_REPOSITORY --name keefi-windows-upgrade-fixtures --dir "$work/build/tests/keefi"
           $zip = @(Get-ChildItem "$work/dist" -Filter '*-windows-x64.zip')
           $probe = @(Get-ChildItem "$work/probe" -Recurse -Filter keefi_update_probe.exe)
           if ($zip.Count -ne 1 -or $probe.Count -ne 1) { throw 'Missing candidate ZIP or probe' }
           Expand-Archive -LiteralPath $zip[0].FullName -DestinationPath "$work/runtime"
           Copy-Item $probe[0].FullName "$work/runtime/KEEFI/keefi_update_probe.exe"
           Remove-Item Env:GH_TOKEN
-          & "$work/runtime/KEEFI/keefi_update_probe.exe" $env:PREVIOUS_VERSION $env:PREVIOUS_BUILD
+          & "$work/runtime/KEEFI/keefi_update_probe.exe" $env:PREVIOUS_VERSION $env:PREVIOUS_BUILD "$work/live.zip"
           if ($LASTEXITCODE -ne 0) { throw 'Public update verification failed' }
+          $env:PATH = "$work/runtime/KEEFI;$env:PATH"
+          python .github/scripts/verify-live-windows-profile.py "$work"

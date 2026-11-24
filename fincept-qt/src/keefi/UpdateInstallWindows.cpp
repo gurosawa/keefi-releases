@@ -2,6 +2,7 @@
 #include "update/WindowsUpdateLaunch.h"
 #include "WindowsPrivateStorage.h"
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -19,15 +20,39 @@ bool startWindowsUpdateForProcess(qint64 oldPid, const QString& installed, const
         !QDir::isAbsolutePath(restartArgs[1]))) return reject(QStringLiteral("프로필 경로를 확인할 수 없습니다."));
 
     const auto id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    // GetTempPath gives this user's normal temporary directory. The directory
-    // containing the copied executable has a protected, current-user-only ACL.
-    const QString scratch = QDir(QDir::tempPath()).filePath("keefi-updater-" + id);
-    if (!createPrivateWindowsDirectory(scratch, error)) return false;
-    const QString helper = QDir(scratch).filePath("KEEFIUpdate.exe");
+    const auto appDir = QFileInfo(installed).absolutePath();
+    const auto defaultProfile = QDir(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation))
+                                    .filePath("KEEFI/Profiles/Local");
+    const auto profile = restartArgs.isEmpty() ? defaultProfile : restartArgs.last();
+    const auto comparable = [](const QString& path) { return QDir::cleanPath(QDir::fromNativeSeparators(path)).toCaseFolded() + '/'; };
+    if (comparable(appDir).startsWith(comparable(profile)) || comparable(profile).startsWith(comparable(appDir)))
+        return reject(QStringLiteral("앱과 금고를 서로 다른 폴더에 두고 업데이트해 주세요."));
 
-    if (!QFile::copy(QDir(QFileInfo(installed).absolutePath()).filePath("KEEFIUpdate.exe"), helper)) {
-        QDir().rmdir(scratch);
+    // A content-addressed helper lives outside the replaceable application.
+    // Retrying the same update reuses it; old unlocked helper versions are
+    // removed without touching any files outside our protected cache.
+    const QString scratch = QDir(QDir::tempPath()).filePath("KEEFI-updater-tools");
+    if (!createPrivateWindowsDirectory(scratch, error)) return false;
+    const DWORD attrs = GetFileAttributesW(QDir::toNativeSeparators(scratch).toStdWString().c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY) ||
+        (attrs & FILE_ATTRIBUTE_REPARSE_POINT) || !privateWindowsPath(scratch, false, error))
+        return reject(QStringLiteral("업데이트 도구 폴더의 소유권을 확인하지 못했습니다."));
+    const auto source = QDir(appDir).filePath("KEEFIUpdate.exe");
+    auto fileHash = [](const QString& path) {
+        QFile file(path);
+        QCryptographicHash hash(QCryptographicHash::Sha256);
+        return file.open(QIODevice::ReadOnly) && hash.addData(&file) ? hash.result().toHex() : QByteArray{};
+    };
+    const QByteArray digest = fileHash(source);
+    if (digest.size() != 64) return reject(QStringLiteral("설치된 업데이트 도구를 확인하지 못했습니다."));
+    const auto helperDir = QDir(scratch);
+    const QString helper = helperDir.filePath("KEEFIUpdate-" + QString::fromLatin1(digest) + ".exe");
+    if (!QFileInfo::exists(helper)) QFile::copy(source, helper);
+    if (fileHash(helper) != digest)
         return reject(QStringLiteral("업데이트 도구를 준비하지 못했습니다."));
+    for (const auto& old : helperDir.entryInfoList({"KEEFIUpdate-*.exe"}, QDir::Files | QDir::NoSymLinks)) {
+        if (old.absoluteFilePath() != helper && old.fileName().size() == QFileInfo(helper).fileName().size())
+            QFile::remove(old.absoluteFilePath());
     }
     const QString eventName = QStringLiteral("Local\\KEEFI-Update-") + id;
     const auto eventWide = eventName.toStdWString();
@@ -45,7 +70,6 @@ bool startWindowsUpdateForProcess(qint64 oldPid, const QString& installed, const
     if (!started) {
         if (ready) CloseHandle(ready);
         if (commit) CloseHandle(commit);
-        QFile::remove(helper); QDir().rmdir(scratch);
         return reject(QStringLiteral("Windows에서 업데이트 도구를 시작하지 못했습니다."));
     }
     HANDLE process = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, DWORD(pid));

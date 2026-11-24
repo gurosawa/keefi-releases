@@ -36,3 +36,12 @@ jobs:
           name: keefi-windows-update-probe
           path: ${{ runner.temp }}/keefi/build/tests/keefi/keefi_update_probe.exe
           if-no-files-found: error
+      - name: Upload profile and installer fixtures for post-publication check
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: keefi-windows-upgrade-fixtures
+          path: |
+            ${{ runner.temp }}/keefi/build/tests/keefi/keefi_update_profile_probe.exe
+            ${{ runner.temp }}/keefi/build/tests/keefi/keefi_update_handoff_probe.exe
+          if-no-files-found: error
+          compression-level: 0

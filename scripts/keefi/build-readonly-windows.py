@@ -186,7 +186,7 @@ def build_package(args):
     targets = ["KEEFI", "KEEFIUpdate"]
     if not args.stage_only:
         targets.extend(f"tst_keefi_{suite}" for suite in SUITES)
-        targets.extend(("keefi_update_profile_probe", "keefi_update_probe"))
+        targets.extend(("keefi_update_profile_probe", "keefi_update_probe", "keefi_update_handoff_probe"))
     subprocess.run([cmake, "--build", build, "--parallel", str(args.jobs), "--target", *targets], env=env, check=True)
     tests, failures = ({}, []) if args.stage_only else isolated_tests(build, env, qt / "plugins")
     binary = build / "KEEFI.exe"

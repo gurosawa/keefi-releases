@@ -603,3 +603,8 @@ add_test(NAME keefi_release_update COMMAND tst_keefi_release_update)
 set_tests_properties(keefi_release_update PROPERTIES TIMEOUT 120 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 add_executable(keefi_update_probe EXCLUDE_FROM_ALL keefi_update_probe.cpp)
 target_link_libraries(keefi_update_probe PRIVATE keefi_ui)
+
+if(WIN32)
+    add_executable(keefi_update_handoff_probe update_handoff_probe.cpp)
+    target_link_libraries(keefi_update_handoff_probe PRIVATE keefi_ui)
+endif()

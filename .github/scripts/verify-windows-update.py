@@ -2,14 +2,12 @@
 import ctypes
 from ctypes import wintypes
 import hashlib
-import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import time
-import uuid
 import zipfile
 
 BASE = "KEEFI-0.18.0-111-windows-x64.zip"
@@ -17,11 +15,9 @@ BASE_SHA = "0afc6313fa46c7e2821e94a083ade861f3da045b4c15e776f84cdaa3c76155c9"
 BASE_URL = "https://github.com/gurosawa/keefi-releases/releases/download/v0.18.0-rc.111/" + BASE
 kernel = ctypes.WinDLL("kernel32", use_last_error=True)
 user = ctypes.WinDLL("user32", use_last_error=True)
-kernel.CreateEventW.argtypes = (ctypes.c_void_p,wintypes.BOOL,wintypes.BOOL,wintypes.LPCWSTR)
-kernel.CreateEventW.restype = wintypes.HANDLE
-kernel.SetEvent.argtypes = (wintypes.HANDLE,)
 kernel.WaitForSingleObject.argtypes = (wintypes.HANDLE,wintypes.DWORD)
 kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+kernel.GetExitCodeProcess.argtypes = (wintypes.HANDLE,ctypes.POINTER(wintypes.DWORD))
 kernel.OpenProcess.argtypes = (wintypes.DWORD,wintypes.BOOL,wintypes.DWORD)
 kernel.OpenProcess.restype = wintypes.HANDLE
 kernel.QueryFullProcessImageNameW.argtypes = (wintypes.HANDLE,wintypes.DWORD,wintypes.LPWSTR,ctypes.POINTER(wintypes.DWORD))
@@ -55,7 +51,7 @@ def window(exe, wanted_pid=None, exclude=0):
             if not kernel.QueryFullProcessImageNameW(handle,0,name,ctypes.byref(size)): return True
             title = ctypes.create_unicode_buffer(512)
             user.GetWindowTextW(hwnd,title,len(title))
-            if Path(name.value)==exe and "KEEFI" in title.value:
+            if (exe is None or Path(name.value)==exe) and "KEEFI" in title.value:
                 result.append((hwnd,tid,pid.value))
                 return False
         finally:
@@ -95,25 +91,31 @@ def commandline_uses_profile(pid, profile):
     return b"--profile-dir" in command and str(profile).lower() in command.decode("utf-8","replace").lower()
 
 
-def helper_process(helper, old, exe, archive, sha, version, build, profile, mode):
-    event="Local\\KEEFI-Update-"+str(uuid.uuid4())
-    ready=kernel.CreateEventW(None,True,False,event)
-    go=kernel.CreateEventW(None,True,False,event+"-commit")
-    assert ready and go
-    try:
-        proc=subprocess.Popen([helper,str(old.pid),event,exe,archive,sha,version,str(build),profile],
-                              cwd=helper.parent)
-        if mode=="tamper":
-            assert proc.wait(20)==22 and kernel.WaitForSingleObject(ready,0)!=0 and old.poll() is None
-            return None
-        end=time.monotonic()+15
-        while kernel.WaitForSingleObject(ready,100)!=0:
-            if proc.poll() is not None or time.monotonic()>end:
-                raise RuntimeError(f"Updater declined before parent quit: {proc.poll()}")
-        assert kernel.SetEvent(go)
-        return proc
-    finally:
-        kernel.CloseHandle(ready); kernel.CloseHandle(go)
+class DetachedUpdater:
+    def __init__(self,pid):
+        self.pid=pid
+        self.handle=kernel.OpenProcess(0x100000|0x1000,False,pid)
+        assert self.handle
+
+    def wait(self,seconds):
+        try:
+            assert kernel.WaitForSingleObject(self.handle,int(seconds*1000))==0
+            code=wintypes.DWORD()
+            assert kernel.GetExitCodeProcess(self.handle,ctypes.byref(code))
+            return code.value
+        finally:
+            kernel.CloseHandle(self.handle)
+
+
+def helper_process(driver, env, old, exe, archive, sha, version, build, profile, mode):
+    attempt = subprocess.run([driver,str(old.pid),exe,archive,sha,version,str(build),profile],env=env,
+                             capture_output=True,timeout=25)
+    if mode=="tamper":
+        assert attempt.returncode==1 and old.poll() is None
+        return None
+    if attempt.returncode!=0:
+        raise RuntimeError(f"Production handoff failed during {mode}: {attempt.stderr!r}")
+    return DetachedUpdater(int(attempt.stdout.strip()))
 
 
 def verify(work, archive, data):
@@ -143,6 +145,7 @@ def verify(work, archive, data):
         test_env={**os.environ,"PATH":os.pathsep.join(map(str,(sdk/"bin",sdk/"Tools/mingw1310_64/bin",os.environ["PATH"])))}
         profile=temp/"test profile"
         probe=work/"build/tests/keefi/keefi_update_profile_probe.exe"
+        driver=work/"build/tests/keefi/keefi_update_handoff_probe.exe"
         subprocess.run([probe,"seed",profile],env=test_env,check=True)
         vault=profile/"credentials.keefi-vault"; marker=profile/".keefi-profile.json"
         before=(digest(vault),digest(marker))
@@ -155,17 +158,19 @@ def verify(work, archive, data):
         old=subprocess.Popen([exe,"--profile-dir",profile],cwd=temp,env=env)
         try:
             original=await_window(exe,old.pid)
-            helper_process(helper,old,exe,tampered,data["sha256"],data["version"],data["build"],profile,"tamper")
+            print("Checking tampered archive against a running 111 application",flush=True)
+            helper_process(driver,test_env,old,exe,tampered,data["sha256"],data["version"],data["build"],profile,"tamper")
             assert digest(exe)==old_exe_hash and before==(digest(vault),digest(marker))
             # Refuse to overwrite a busy existing package component after some
             # preceding files have been replaced, then relaunch the old app.
             busy=kernel.CreateFileW(str(app/"Qt6Widgets.dll"),0x80000000,1,None,3,0,None)
             assert busy and busy!=wintypes.HANDLE(-1).value
             try:
-                fail=helper_process(helper,old,exe,archive,data["sha256"],data["version"],data["build"],profile,"rollback")
+                print("Checking replacement rollback with a locked package DLL",flush=True)
+                fail=helper_process(driver,test_env,old,exe,archive,data["sha256"],data["version"],data["build"],profile,"rollback")
                 stop_window(original)
                 restored=await_window(exe,exclude=old.pid)
-                notice=await_window(helper,fail.pid);user.PostMessageW(notice[0],0x0010,0,0)
+                notice=await_window(None,fail.pid);user.PostMessageW(notice[0],0x0010,0,0)
                 assert fail.wait(12)==19
                 assert digest(exe)==old_exe_hash and sentinel.read_bytes()==b"portable-user-file"
             finally:
@@ -174,7 +179,8 @@ def verify(work, archive, data):
             subprocess.run([probe,"check",profile],env=test_env,check=True)
             old=subprocess.Popen([exe,"--profile-dir",profile],cwd=temp,env=env)
             original=await_window(exe,old.pid)
-            good=helper_process(helper,old,exe,archive,data["sha256"],data["version"],data["build"],profile,"install")
+            print("Checking actual replacement and relaunch into the seeded profile",flush=True)
+            good=helper_process(driver,test_env,old,exe,archive,data["sha256"],data["version"],data["build"],profile,"install")
             stop_window(original)
             assert good.wait(60)==0
             updated=await_window(exe,exclude=old.pid)

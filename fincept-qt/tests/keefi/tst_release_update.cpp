@@ -1,6 +1,8 @@
 #include "keefi/ReleaseUpdater.h"
 #include "keefi/LocalWindow.h"
 #include "keefi/Vault.h"
+#include "keefi/PortfolioController.h"
+#include "keefi/TradingTransport.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -64,6 +66,12 @@ protected:
 private:
     QByteArray bytes_;
     qint64 pos_ = 0;
+};
+
+class NoBrokerNetwork final : public TradingTransport {
+public:
+    void send(quint64, const RequestSpec&) override { QFAIL("Unexpected broker request"); }
+    void abort() override {}
 };
 
 class GitHub final : public QNetworkAccessManager {
@@ -147,7 +155,14 @@ private slots:
         QVERIFY2(vault.addAccount(record, {{"app_key","fixture-key"},{"app_secret","fixture-secret"}}, StorageMode::EncryptedVault, &error), qPrintable(error));
         const auto accountId=vault.accounts().first().id;
         AccountModel accounts(&vault);
+        NoBrokerNetwork isolated;
+        PortfolioController::Factories factories;
+        factories.trading = [&](const AccountRecord&) { return &isolated; };
+        factories.prices = [] { return new NoBrokerNetwork; };
+        PortfolioController portfolio(vault, nullptr, factories);
+        portfolio.setAutomaticRefresh(false);
         LocalWindow window(vault, accounts);
+        window.setPortfolioController(&portfolio);
         const bool save = fault != "flush";
         window.setQuitPreparation([save](auto done) { done(save); });
         bool invoked = false, lockedAtInstall = false;

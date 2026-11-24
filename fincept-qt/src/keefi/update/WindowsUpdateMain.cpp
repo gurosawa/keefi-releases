@@ -120,10 +120,10 @@ void makePrivate(const fs::path& dir) {
     SECURITY_ATTRIBUTES attr{sizeof(attr),desc,FALSE};
     bool created = CreateDirectoryW(dir.c_str(),&attr); LocalFree(desc); require(created,14);
 }
-void move(const fs::path& from, const fs::path& to) {
+void move(const fs::path& from, const fs::path& to, bool replace = false) {
     // Antivirus can briefly hold freshly scanned files after child processes exit.
     for (int i=0; i<30; ++i) {
-        if (MoveFileExW(from.c_str(),to.c_str(),MOVEFILE_WRITE_THROUGH)) return;
+        if (MoveFileExW(from.c_str(),to.c_str(),MOVEFILE_WRITE_THROUGH | (replace ? MOVEFILE_REPLACE_EXISTING : 0))) return;
         DWORD e=GetLastError();
         if(e != ERROR_SHARING_VIOLATION && e != ERROR_ACCESS_DENIED) break;
         Sleep(100);
@@ -151,6 +151,19 @@ Names inventory(const fs::path& dir) {
             rel.generic_string()==line && !rel.filename().empty(),15);
         for(const auto& component:rel) {
             Str n=component.wstring(); require(n!=L".." && n!=L"." && n.back()!=L'.' && n.back()!=L' ',15);
+        }
+        // Existing portable inventories can never authorize deletion of arbitrary
+        // documents, wallets or account files beside the installed app.
+        const auto lower=folded(rel.generic_wstring());
+        if (!rel.has_parent_path()) {
+            require(rel.extension()==L".dll" || lower==L"keefi.exe" || lower==L"keefiupdate.exe" ||
+                    lower==L"qt.conf" || lower==L"license" || lower==L"notice" ||
+                    lower==L"third-party-notices.md" || lower==inventoryName,15);
+        } else {
+            const Str top=folded(rel.begin()->wstring());
+            require(top==L"licenses" || (rel.extension()==L".dll" &&
+                (top==L"generic" || top==L"imageformats" || top==L"networkinformation" ||
+                 top==L"platforms" || top==L"styles" || top==L"tls")),15);
         }
         require(result.emplace(rel.generic_wstring()).second,15);
     }
@@ -186,34 +199,56 @@ void unpack(const fs::path& zip, const fs::path& dest) {
     require(roots==1,16);
 }
 
-// Move only package-owned files. Extra files, empty user directories, and a
-// user's documents never change location. A failed install replays the moves
-// in reverse. If undo fails, retain the complete backup for manual recovery.
+// Preserve a complete runnable copy of the previous installation before the
+// first mutation. Each live pathname is replaced in one write-through rename.
+// Unmanaged documents and profile files never move, even temporarily.
 void install(const fs::path& app,const fs::path& candidate,const fs::path& work,
              const Names& oldFiles,const Names& newFiles,const std::vector<Str>& profile) {
     const fs::path backup=work/L"previous";
     require(fs::create_directory(backup),19);
-    std::vector<fs::path> saved, installed;
-    saved.reserve(oldFiles.size()); installed.reserve(newFiles.size());
+    for (const auto& name:oldFiles) {
+        const fs::path rel(name), old=app/rel;
+        noRedirection(old);
+        require(fs::is_regular_file(old),18);
+        fs::create_directories((backup/rel).parent_path());
+        require(CopyFileW(old.c_str(),(backup/rel).c_str(),TRUE),19);
+    }
+    std::vector<fs::path> changed;
+    changed.reserve(oldFiles.size()+newFiles.size());
+    auto apply=[&](const fs::path& rel) {
+        const auto dest=app/rel;
+        noRedirection(dest);
+        fs::create_directories(dest.parent_path());
+        const bool previouslyOwned=oldFiles.count(rel.generic_wstring())!=0;
+        move(candidate/rel,dest,previouslyOwned);
+        changed.push_back(rel);
+    };
     try {
+        // Replace the entry-point last, after its DLLs, plugins and notices.
+        for(const auto& name:newFiles) if(_wcsicmp(name.c_str(),L"KEEFI.exe")!=0) apply(fs::path(name));
         for(const auto& name:oldFiles) {
-            fs::path rel(name),old=app/rel; noRedirection(old);
-            if(!fs::exists(old)) continue;
-            require(fs::is_regular_file(old),18);
-            fs::create_directories((backup/rel).parent_path());
-            move(old,backup/rel); saved.push_back(rel);
+            if(newFiles.count(name)) continue;
+            const fs::path rel(name);
+            const auto obsolete=work/L"obsolete"/rel;
+            fs::create_directories(obsolete.parent_path());
+            move(app/rel,obsolete);
+            changed.push_back(rel);
         }
-        for(const auto& name:newFiles) {
-            fs::path rel(name),dest=app/rel; noRedirection(dest);
-            require(!fs::exists(dest),18);
-            fs::create_directories(dest.parent_path());
-            move(candidate/rel,dest); installed.push_back(rel);
-        }
+        apply(L"KEEFI.exe");
         startInstalled(app/L"KEEFI.exe",profile);
     } catch(...) {
         try {
-            for(auto i=installed.rbegin();i!=installed.rend();++i) move(app / *i,candidate / *i);
-            for(auto i=saved.rbegin();i!=saved.rend();++i) move(backup / *i,app / *i);
+            for(auto it=changed.rbegin();it!=changed.rend();++it) {
+                const auto dest=app/ *it;
+                if(oldFiles.count(it->generic_wstring())) {
+                    const auto restore=work/L"restore"/ *it;
+                    fs::create_directories(restore.parent_path());
+                    require(CopyFileW((backup/ *it).c_str(),restore.c_str(),TRUE),21);
+                    move(restore,dest,true);
+                } else {
+                    require(DeleteFileW(dest.c_str()),21);
+                }
+            }
         } catch (...) { throw Error{21}; }
         throw;
     }
@@ -227,14 +262,14 @@ int update(int argc,wchar_t** argv) {
     require(same(exe.filename(),L"KEEFI.exe") && !same(app,app.root_path()) && !within(archive,app),10);
     noRedirection(exe); noRedirection(archive);
     Handle parent(OpenProcess(SYNCHRONIZE|PROCESS_QUERY_LIMITED_INFORMATION,FALSE,pid));
-    require(parent.valid() && same(fs::path(processPath(parent.h)),exe),12);
+    require(parent.valid() && fs::equivalent(fs::path(processPath(parent.h)),exe),12);
     Handle ready(OpenEventW(EVENT_MODIFY_STATE,FALSE,event.c_str()));
     Handle go(OpenEventW(SYNCHRONIZE,FALSE,(event+L"-commit").c_str()));
     require(ready.valid() && go.valid(),10);
     std::vector<Str> profile;
     if(argc==9) {
         auto path=fs::path(argv[8]);
-        require(path.is_absolute() && !within(path.lexically_normal(),app),17);
+        require(path.is_absolute() && !within(path.lexically_normal(),app) && !within(app,path.lexically_normal()),17);
         profile={L"--profile-dir",path.wstring()};
     }
     Handle zip(CreateFileW(archive.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,

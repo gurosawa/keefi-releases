@@ -1,6 +1,7 @@
 #include "ProfileUpgradePrivate.h"
 #include "LegacyStorageCodecPrivate.h"
 #include "Vault.h"
+#include "WindowsPrivateStorage.h"
 
 #include <QTemporaryDir>
 #include <qt_windows.h>
@@ -87,7 +88,7 @@ ProfileReady createFreshProfile(const ProfileUpgradePlan& plan, const QString& v
         return {};
     }
     file.close();
-    if (!storage_detail::privateStoragePath(stagedMarker, false, error)
+    if (!privateWindowsPath(stagedMarker, true, error)
         || revalidatedPlan(current, error).action != ProfileUpgradeAction::CreateCurrent) return {};
     const auto from = QDir::toNativeSeparators(stagedMarker).toStdWString();
     const auto to = QDir::toNativeSeparators(QDir(current.targetDirectory).filePath(ActiveMarkerName)).toStdWString();

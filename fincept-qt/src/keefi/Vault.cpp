@@ -38,7 +38,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
-#include <aclapi.h>
+#include "WindowsPrivateStorage.h"
 #include <io.h>
 #endif
 
@@ -519,54 +519,7 @@ bool decodePayload(const SecureBuffer& payload, std::vector<Entry>* entries, QJs
     return (cursor.remaining==0&&used.size()==stores.size()&&validCredentialReferences(*entries))||invalid();
 }
 
-#ifdef Q_OS_WIN
-bool privateWindowsPath(const QString& path, bool setAcl) {
-    HANDLE token = nullptr;
-    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return false;
-    DWORD size = 0;
-    GetTokenInformation(token, TokenUser, nullptr, 0, &size);
-    std::vector<unsigned char> user(size);
-    const bool gotUser = GetTokenInformation(token, TokenUser, user.data(), size, &size);
-    CloseHandle(token);
-    if (!gotUser) return false;
-    const auto sid = reinterpret_cast<TOKEN_USER*>(user.data())->User.Sid;
-    auto* name = const_cast<wchar_t*>(reinterpret_cast<const wchar_t*>(path.utf16()));
-    if (setAcl) {
-        EXPLICIT_ACCESSW access{};
-        access.grfAccessPermissions = FILE_ALL_ACCESS;
-        access.grfAccessMode = SET_ACCESS;
-        access.grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
-        access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
-        access.Trustee.TrusteeType = TRUSTEE_IS_USER;
-        access.Trustee.ptstrName = static_cast<LPWSTR>(sid);
-        PACL acl = nullptr;
-        if (SetEntriesInAclW(1, &access, nullptr, &acl) != ERROR_SUCCESS) return false;
-        const DWORD status = SetNamedSecurityInfoW(name, SE_FILE_OBJECT,
-            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION, nullptr, nullptr, acl, nullptr);
-        LocalFree(acl);
-        if (status != ERROR_SUCCESS) return false;
-    }
-    PSECURITY_DESCRIPTOR descriptor = nullptr;
-    PSID owner = nullptr;
-    PACL acl = nullptr;
-    if (GetNamedSecurityInfoW(name, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
-                             &owner, nullptr, &acl, nullptr, &descriptor) != ERROR_SUCCESS) return false;
-    bool valid = owner && EqualSid(owner, sid) && acl;
-    for (DWORD i = 0; valid && i < acl->AceCount; ++i) {
-        void* ace = nullptr;
-        if (!GetAce(acl, i, &ace)) { valid = false; break; }
-        const auto* head = static_cast<ACE_HEADER*>(ace);
-        if (head->AceType == ACCESS_ALLOWED_ACE_TYPE) {
-            const auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
-            valid = EqualSid(const_cast<DWORD*>(&allowed->SidStart), sid);
-        } else if (head->AceType != ACCESS_DENIED_ACE_TYPE) {
-            valid = false;
-        }
-    }
-    LocalFree(descriptor);
-    return valid;
-}
-#endif
+
 
 bool privatePath(const QString& path, bool directory, QString* error) {
     const auto invalid = [&] { return fail(error, QStringLiteral("금고 경로의 소유자·권한·심볼릭 링크를 확인해 주세요.")); };
@@ -605,7 +558,8 @@ bool privatePath(const QString& path, bool directory, QString* error) {
     if (!safe) return invalid();
 #endif
 #elif defined(Q_OS_WIN)
-    if (!privateWindowsPath(path, false)) return invalid();
+    if (info.isJunction()) return invalid();
+    if (!privateWindowsPath(path, false, error)) return false;
 #else
     return fail(error, QStringLiteral("이 운영체제의 금고 접근 권한 검증은 지원하지 않습니다."));
 #endif
@@ -617,12 +571,11 @@ bool ensureDirectory(const QString& path, bool create, QString* error) {
     if (QFileInfo(dir).isSymLink())
         return fail(error, QStringLiteral("금고 폴더의 심볼릭 링크를 거부했습니다."));
     if (!QFileInfo::exists(dir)) {
-        if (!create || !QDir().mkpath(dir))
-            return fail(error, QStringLiteral("금고 폴더를 열거나 만들 수 없습니다."));
+        if (!create) return fail(error, QStringLiteral("금고 폴더를 열 수 없습니다."));
 #ifdef Q_OS_WIN
-        if (!privateWindowsPath(dir, true))
-            return fail(error, QStringLiteral("금고 폴더를 현재 사용자 전용으로 보호하지 못했습니다."));
+        if (!createPrivateWindowsDirectory(dir, error)) return false;
 #else
+        if (!QDir().mkpath(dir)) return fail(error, QStringLiteral("금고 폴더를 만들 수 없습니다."));
         if (!QFile::setPermissions(dir, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner))
             return fail(error, QStringLiteral("금고 폴더를 현재 사용자 전용으로 보호하지 못했습니다."));
 #endif
@@ -774,8 +727,7 @@ bool atomicWrite(const QString& path, const QByteArray& bytes, const SecureBuffe
     if (!temp.open())
         return fail(error, QStringLiteral("암호화 금고 임시 파일을 만들 수 없습니다."));
 #ifdef Q_OS_WIN
-    if (!privateWindowsPath(temp.fileName(), true))
-        return fail(error, QStringLiteral("임시 금고 접근 권한을 제한하지 못했습니다."));
+    if (!privateWindowsPath(temp.fileName(), true, error)) return false;
 #else
     if (!temp.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner))
         return fail(error, QStringLiteral("임시 금고 접근 권한을 제한하지 못했습니다."));
@@ -837,8 +789,7 @@ bool installBackup(const QString& path, const QByteArray& bytes, QString* error)
     auto& temp = staged.file();
     if (!temp.open()) return fail(error, QStringLiteral("복원할 임시 금고를 만들지 못했습니다."));
 #ifdef Q_OS_WIN
-    if (!privateWindowsPath(temp.fileName(), true))
-        return fail(error, QStringLiteral("복원할 임시 금고의 접근 권한을 제한하지 못했습니다."));
+    if (!privateWindowsPath(temp.fileName(), true, error)) return false;
 #else
     if (!temp.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner))
         return fail(error, QStringLiteral("임시 금고 접근 권한을 제한하지 못했습니다."));

@@ -77,22 +77,29 @@ def run_tests(build, env):
     selected = {"connection_form": FORM_CASES, "local_window": WINDOW_CASES,
                 "profile_upgrade": ("emptyStateCreatesOnlyTheNewIdentity",)}
     results = {}
+    failures = []
     for suite in SUITES:
         # QTest's Windows GUI backend exercises the native platform through the same public entry points.
         exe = build / "tests" / "keefi" / f"tst_keefi_{suite}.exe"
         log = build / f"packaging-{suite}.txt"
         log.unlink(missing_ok=True)
-        result = subprocess.run([exe, *selected.get(suite, ()), "-o", f"{log},txt"], env=env, timeout=480)
+        try:
+            code = subprocess.run([exe, *selected.get(suite, ()), "-o", f"{log},txt"], env=env, timeout=480).returncode
+        except (OSError, subprocess.TimeoutExpired) as error:
+            code = None
+            print(f"{suite}: {error}", flush=True)
         output = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
         totals = re.search(r"Totals:\s*(\d+) passed,\s*(\d+) failed,\s*(\d+) skipped,\s*(\d+) blacklisted", output)
-        if not (result.returncode == 0 and totals and int(totals[1]) > 2 and totals.groups()[1:] == ("0", "0", "0")):
+        if not (code == 0 and totals and int(totals[1]) > 2 and totals.groups()[1:] == ("0", "0", "0")):
             for line in output.splitlines():
                 if line.lstrip().startswith(("FAIL!", "QFATAL", "SKIP", "XPASS", "Loc:", "Totals:")):
                     print(line, flush=True)
-            raise RuntimeError(f"Native {suite} tests exited {result.returncode}; see {log}")
+            failures.append(suite)
+            print(f"Native {suite} tests failed (exit {code}); see {log}", flush=True)
+            continue
         print(f"{suite}: {totals[0]}", flush=True)
         results[suite] = int(totals[1])
-    return results
+    return results, failures
 
 
 def isolated_tests(build, env, plugins):
@@ -129,19 +136,27 @@ def smoke_extracted(app, work, version):
     system = Path(os.environ["SystemRoot"])
     env.update(PATH=os.pathsep.join(map(str, (system / "System32", system))), QT_QPA_PLATFORM="windows")
     reports = []
+    failures = []
     for attempt in ("first", "reopen"):
         report = work / f"{attempt}.json"
-        result = subprocess.run([app / "KEEFI.exe", "--profile-dir", work / "profile", "--smoke-report", report],
-                                cwd=app, env=env, timeout=90)
-        require(report.is_file(), f"{attempt} startup exited {result.returncode} before producing a smoke report")
-        data = json.loads(report.read_text(encoding="utf-8"))
+        try:
+            code = subprocess.run([app / "KEEFI.exe", "--profile-dir", work / "profile", "--smoke-report", report],
+                                  cwd=app, env=env, timeout=90).returncode
+        except (OSError, subprocess.TimeoutExpired) as error:
+            code = None
+            print(f"Packaged {attempt} startup: {error}", flush=True)
+        data = json.loads(report.read_text(encoding="utf-8")) if report.is_file() else {}
         expected = {"application": "KEEFI", "application_version": version, "build_channel": "production",
                     "read_only_build": True, "security_ready": True, "visible": True, "startup_vault_gate_visible": True,
                     "vault_unlocked": False, "vault_exists": False, "account_count": 0, "windows_schannel_ready": True}
-        require(result.returncode == 0 and all(data.get(k) == v for k, v in expected.items()),
-                f"Unexpected packaged {attempt} startup (exit {result.returncode}): {data}")
-        reports.append(data)
-    return reports
+        fields = ("startup_phase", "security_status", "process_hardened", "security_ready", "windows_schannel_ready")
+        summary = {k: data[k] for k in fields if k in data}
+        print(f"Packaged {attempt} startup (exit {code}): {json.dumps(summary)}", flush=True)
+        if code == 0 and all(data.get(k) == v for k, v in expected.items()):
+            reports.append(data)
+        else:
+            failures.append(f"packaged {attempt} startup")
+    return reports, failures
 
 
 def build_package(args):
@@ -172,7 +187,7 @@ def build_package(args):
     if not args.stage_only:
         targets.extend(f"tst_keefi_{suite}" for suite in SUITES)
     subprocess.run([cmake, "--build", build, "--parallel", str(args.jobs), "--target", *targets], env=env, check=True)
-    tests = {} if args.stage_only else isolated_tests(build, env, qt / "plugins")
+    tests, failures = ({}, []) if args.stage_only else isolated_tests(build, env, qt / "plugins")
     binary = build / "KEEFI.exe"
     version, revision = file_version(binary)
     stem = f"KEEFI-{version}-{revision}-windows-x64"
@@ -207,7 +222,9 @@ def build_package(args):
         if not args.stage_only:
             with zipfile.ZipFile(archive) as z:
                 z.extractall(work / "unpacked")
-            reports = smoke_extracted(work / "unpacked/KEEFI", work, version)
+            reports, smoke_failures = smoke_extracted(work / "unpacked/KEEFI", work, version)
+            failures.extend(smoke_failures)
+            require(not failures, f"Windows candidate verification failed: {', '.join(failures)}")
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         checksum = work / (archive.name + ".sha256")
         checksum.write_text(f"{digest}  {archive.name}\n", encoding="ascii")

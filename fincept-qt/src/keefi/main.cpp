@@ -104,6 +104,17 @@ int main(int argc, char* argv[]) {
         ? std::optional<QString>{parser.value(QStringLiteral("profile-dir"))} : std::nullopt;
     keefi::PlatformSecurity security;
     security.initialize();
+    const auto startupFailure = [&](int code, const QString& phase) {
+        if (smoke) {
+            // Keep profile paths, OS error text and account information out of diagnostics.
+            const QJsonObject status{{"startup_phase", phase}, {"process_hardened", hardened},
+                {"security_ready", hardened && security.ready()}, {"security_status", security.statusCode()}};
+            QFile report(parser.value(QStringLiteral("smoke-report")));
+            if (report.open(QIODevice::WriteOnly | QIODevice::NewOnly))
+                report.write(QJsonDocument(status).toJson());
+        }
+        return code;
+    };
     QString profileError;
     const QString base = explicitProfile.has_value() ? QString{}
         : QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
@@ -120,7 +131,7 @@ int main(int argc, char* argv[]) {
     auto plan = keefi::planProfileUpgrade(requestedProfile, base);
     if (plan.action == keefi::ProfileUpgradeAction::Unavailable) {
         if (!smoke) QMessageBox::critical(nullptr, QStringLiteral("%1 프로필을 열 수 없습니다").arg(keefi::productName()), plan.error);
-        return 3;
+        return startupFailure(3, QStringLiteral("plan_profile"));
     }
     const keefi::ProfileStageConverter convert = [](
         const QString& stage, const QString& password, keefi::ProfileConversionReceipt* receipt, QString* error) {
@@ -191,7 +202,8 @@ int main(int argc, char* argv[]) {
     if (selected.directory.isEmpty()
         || !keefi::configureIdentityScheme(selected.identityScheme, &profileError)) {
         if (!smoke) QMessageBox::critical(nullptr, QStringLiteral("%1 프로필을 열 수 없습니다").arg(keefi::productName()), profileError);
-        return 3;
+        return startupFailure(3, plan.action == keefi::ProfileUpgradeAction::CreateCurrent
+            ? QStringLiteral("create_profile") : QStringLiteral("open_profile"));
     }
     const QString profile = selected.directory;
     const keefi::ProfileSettingsIdentity settingsIdentity{keefi::productName(), applicationName};
@@ -199,14 +211,14 @@ int main(int argc, char* argv[]) {
         QMessageBox::information(nullptr, applicationName, selected.warning);
     if (profile.isEmpty() || !keefi::Vault::prepareProfileDirectory(profile, &profileError)) {
         if (!smoke) QMessageBox::critical(nullptr, QStringLiteral("%1 프로필을 열 수 없습니다").arg(keefi::productName()), profileError);
-        return 3;
+        return startupFailure(3, QStringLiteral("secure_profile"));
     }
     QLockFile instanceLock(QDir(profile).filePath(QStringLiteral("instance.lock")));
     instanceLock.setStaleLockTime(0);
     if (!instanceLock.tryLock(0)) {
         if (!smoke) QMessageBox::information(nullptr, keefi::productName(),
             QStringLiteral("같은 프로필을 다른 %1 창에서 사용 중이거나 잠금 파일을 만들 수 없습니다.").arg(keefi::productName()));
-        return 4;
+        return startupFailure(4, QStringLiteral("lock_profile"));
     }
     QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, profile);
@@ -422,6 +434,7 @@ int main(int argc, char* argv[]) {
             const auto* startupGate = window.findChild<QWidget*>(QStringLiteral("vaultGate"));
             const bool startupGateVisible = startupGate && startupGate->isVisible();
             QJsonObject result{{"application", applicationName}, {"stage", "G8"}, {"read_only_build", keefi::readOnlyBuild()},
+                {"startup_phase", "vault_gate"}, {"process_hardened", hardened},
                 {"build_channel", developmentBuild ? "development" : "production"},
                 {"application_version", QCoreApplication::applicationVersion()},
                 {"window_title", window.windowTitle()},

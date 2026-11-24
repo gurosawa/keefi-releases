@@ -48,7 +48,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
-#include <aclapi.h>
+#include "WindowsPrivateStorage.h"
 #include <io.h>
 #endif
 namespace keefi {
@@ -59,54 +59,7 @@ namespace {
 constexpr qsizetype HeaderBytes=40;
 constexpr qint64 MinuteMs=60000,DayMs=86400000;
 bool fail(QString* error,const QString& message){if(error)*error=message;return false;}
-#ifdef Q_OS_WIN
-bool privateWindowsPath(const QString& path, bool setAcl) {
-    HANDLE token = nullptr;
-    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return false;
-    DWORD size = 0;
-    GetTokenInformation(token, TokenUser, nullptr, 0, &size);
-    std::vector<unsigned char> user(size);
-    const bool gotUser = GetTokenInformation(token, TokenUser, user.data(), size, &size);
-    CloseHandle(token);
-    if (!gotUser) return false;
-    const auto sid = reinterpret_cast<TOKEN_USER*>(user.data())->User.Sid;
-    auto* name = const_cast<wchar_t*>(reinterpret_cast<const wchar_t*>(path.utf16()));
-    if (setAcl) {
-        EXPLICIT_ACCESSW access{};
-        access.grfAccessPermissions = FILE_ALL_ACCESS;
-        access.grfAccessMode = SET_ACCESS;
-        access.grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
-        access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
-        access.Trustee.TrusteeType = TRUSTEE_IS_USER;
-        access.Trustee.ptstrName = static_cast<LPWSTR>(sid);
-        PACL acl = nullptr;
-        if (SetEntriesInAclW(1, &access, nullptr, &acl) != ERROR_SUCCESS) return false;
-        const DWORD status = SetNamedSecurityInfoW(name, SE_FILE_OBJECT,
-            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION, nullptr, nullptr, acl, nullptr);
-        LocalFree(acl);
-        if (status != ERROR_SUCCESS) return false;
-    }
-    PSECURITY_DESCRIPTOR descriptor = nullptr;
-    PSID owner = nullptr;
-    PACL acl = nullptr;
-    if (GetNamedSecurityInfoW(name, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
-                             &owner, nullptr, &acl, nullptr, &descriptor) != ERROR_SUCCESS) return false;
-    bool valid = owner && EqualSid(owner, sid) && acl;
-    for (DWORD i = 0; valid && i < acl->AceCount; ++i) {
-        void* ace = nullptr;
-        if (!GetAce(acl, i, &ace)) { valid = false; break; }
-        const auto* head = static_cast<ACE_HEADER*>(ace);
-        if (head->AceType == ACCESS_ALLOWED_ACE_TYPE) {
-            const auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
-            valid = EqualSid(const_cast<DWORD*>(&allowed->SidStart), sid);
-        } else if (head->AceType != ACCESS_DENIED_ACE_TYPE) {
-            valid = false;
-        }
-    }
-    LocalFree(descriptor);
-    return valid;
-}
-#endif
+
 
 bool privatePath(const QString& path, bool directory, QString* error) {
     const auto invalid = [&] { return fail(error, QStringLiteral("금고 경로의 소유자·권한·심볼릭 링크를 확인해 주세요.")); };

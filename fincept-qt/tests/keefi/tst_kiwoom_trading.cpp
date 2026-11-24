@@ -65,12 +65,19 @@ struct Context {
     FakeTransport wire;
     BrokerTradingController controller{vault,&wire,nullptr,[](const AccountRecord& a){return std::make_unique<KiwoomAdapter>(a.environment,kiwoomNow);}};
     QString id;
+    QString setupError;
     bool valid=false;
     Context() {
         wire.vault=&vault;
         AccountRecord a; a.provider="kiwoom"; a.alias="가짜 키움 연결"; a.market="domestic_equity"; a.environment="live"; a.currency="KRW";
-        valid=dir.isValid() && vault.create(Password) && vault.addAccount(a,{{"app_key","KIWOOM_FAKE_APP_KEY"},{"app_secret","KIWOOM_FAKE_SECRET"}},StorageMode::EncryptedVault);
-        if (valid) id=vault.accounts().first().id;
+        if (!dir.isValid()) { setupError = "temporary-directory"; return; }
+        if (!vault.create(Password, &setupError)) { setupError.prepend("create-vault: "); return; }
+        if (!vault.addAccount(a, {{"app_key","KIWOOM_FAKE_APP_KEY"},{"app_secret","KIWOOM_FAKE_SECRET"}},
+                              StorageMode::EncryptedVault, &setupError)) {
+            setupError.prepend("save-account: "); return;
+        }
+        valid = true;
+        id = vault.accounts().first().id;
     }
     bool authenticate() {
         if (!controller.selectConnection(id)) return false;
@@ -102,7 +109,7 @@ private slots:
     }
     void catalogPaginationPreservesSources() {
         QFETCH(bool,auxiliaryFailure); QFETCH(bool,duplicate);
-        Context c; QVERIFY(c.valid); int privatePages=0;
+        Context c; QVERIFY2(c.valid, qPrintable(c.setupError)); int privatePages=0;
         c.wire.overrideResponse=[&](const RequestSpec& request,HttpResult response) {
             if (auxiliaryFailure && request.url.host()=="new.real.download.dws.co.kr" && request.url.path().contains("kospi")) {
                 response.status=503; response.body="{}"; return response;
@@ -142,7 +149,7 @@ private slots:
         QTest::newRow("recent-received-expired-source")<<121<<false;
     }
     void referenceSourceAgeIsSeparateFromReceiptAge() {
-        QFETCH(int,ageSeconds); QFETCH(bool,ready); Context c; QVERIFY(c.valid);
+        QFETCH(int,ageSeconds); QFETCH(bool,ready); Context c; QVERIFY2(c.valid, qPrintable(c.setupError));
         c.wire.overrideResponse=[&](const RequestSpec& request,HttpResult response) {
             if (request.operation!=Operation::Reference) return response;
             return kiwoomJson({{"stk_cd","005930"},{"stk_min_pole_chart_qry",QJsonArray{QJsonObject{{"cntr_tm",kiwoomNow().addSecs(-ageSeconds).toTimeZone(QTimeZone("Asia/Seoul")).toString("yyyyMMddHHmmss")},{"cur_prc","+70000"},{"trde_qty","10"}}}}});
@@ -156,7 +163,7 @@ private slots:
         QTest::addColumn<bool>("duplicate"); QTest::newRow("target-on-first-page")<<false; QTest::newRow("same-id-across-pages")<<true;
     }
     void cancellationUsesAllHistoryPages() {
-        QFETCH(bool,duplicate); Context c; QVERIFY(c.valid); QVERIFY2(c.prepare(),qPrintable(c.controller.status()));
+        QFETCH(bool,duplicate); Context c; QVERIFY2(c.valid, qPrintable(c.setupError)); QVERIFY2(c.prepare(),qPrintable(c.controller.status()));
         int pages=0;
         c.wire.overrideResponse=[&](const RequestSpec& request,HttpResult response) {
             if (request.operation!=Operation::History) return response;

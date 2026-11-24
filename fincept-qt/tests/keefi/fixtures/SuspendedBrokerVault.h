@@ -4,6 +4,9 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QTest>
+#ifdef Q_OS_WIN
+#include "keefi/WindowsPrivateStorage.h"
+#endif
 
 namespace keefi::test {
 // The fixture was written by Dev 110 using synthetic credentials for two live brokers.
@@ -20,6 +23,9 @@ inline bool openSuspendedBrokerFixture(Vault& vault) {
         || !copy.setPermissions(QFile::ReadOwner | QFile::WriteOwner)
         || copy.write(bytes) != bytes.size() || !copy.flush()) return false;
     copy.close();
+#ifdef Q_OS_WIN
+    if (!privateWindowsPath(vault.filePath(), true)) return false;
+#endif
     return vault.unlock(QStringLiteral("Synthetic suspended brokers 2026!"));
 }
 inline bool keepSingleSuspendedBroker(Vault& vault, const QString& provider, const QString& password) {

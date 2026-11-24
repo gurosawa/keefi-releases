@@ -4499,20 +4499,30 @@ void LocalWindowTest::suspendedBrokersKeepOnlyRemovalAction() {
     LocalWindow window(vault, accounts);
     window.setPortfolioController(&portfolio);
     window.setSecurityStatus(true);
-    window.resize(1440, 900);
+    window.resize(720, 640);
     window.show();
     auto* pages = child<QTabWidget>(window, "portfolioPages");
     pages->setCurrentWidget(child<QWidget>(window, "connectionsPage"));
     auto* list = child<QListView>(window, "accountList");
+    auto* back = child<QPushButton>(window, "connectionDetailBack");
     auto* remove = child<QPushButton>(window, "removeAccount");
     const auto saved = vault.accounts();
+    QTRY_VERIFY(list->isVisible());
     for (const auto& account : saved) {
+        if (back->isVisible()) {
+            QTest::mouseClick(back, Qt::LeftButton);
+            QTRY_VERIFY(list->isVisible());
+        }
         auto* model = dynamic_cast<const ConnectionListModel*>(list->model());
         QVERIFY(model);
         const auto row = model->rowForAccount(account.id);
         QVERIFY(row >= 0);
-        list->setCurrentIndex(model->index(row, 0));
-        QVERIFY(model->index(row, 0).data(Qt::AccessibleTextRole).toString().contains("연결 비활성"));
+        const auto index = model->index(row, 0);
+        QVERIFY(index.data(Qt::AccessibleTextRole).toString().contains("연결 비활성"));
+        list->scrollTo(index);
+        QTRY_VERIFY(list->viewport()->rect().contains(list->visualRect(index).center()));
+        QTest::mouseClick(list->viewport(), Qt::LeftButton, {}, list->visualRect(index).center());
+        QTRY_VERIFY(back->isVisible() && !list->isVisible());
         QVERIFY(child<QLabel>(window, "connectionReadState")->text().contains("비활성"));
         QVERIFY(child<QLabel>(window, "connectionActionScope")->isVisibleTo(&window));
         for (const auto* name : {"replaceCredentials", "refreshSelectedConnection", "reconnectReadAccount", "connectionAssets"}) {
@@ -4524,8 +4534,9 @@ void LocalWindowTest::suspendedBrokersKeepOnlyRemovalAction() {
         QCOMPARE(child<QComboBox>(window, "portfolioAccountFilter")->findData(account.id), -1);
         QVERIFY(!window.findChild<AccountDialog*>("accountDialog"));
         QVERIFY(remove->isVisibleTo(&window) && remove->isEnabled());
-        remove->click();
+        QTest::mouseClick(remove, Qt::LeftButton);
         auto* confirm = child<QMessageBox>(window, "removeAccountConfirmation");
+        QVERIFY(confirm);
         QVERIFY(confirm->text().contains(account.alias));
         child<QPushButton>(*confirm, "confirmRemoveAccount")->click();
         processDeletion();

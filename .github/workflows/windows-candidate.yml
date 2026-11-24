@@ -14,7 +14,7 @@ jobs:
           persist-credentials: false
       - name: Build and test the Windows x64 ZIP
         shell: pwsh
-        run: ./scripts/keefi/build-windows-candidate.ps1 -WorkDir "$env:RUNNER_TEMP/keefi"
+        run: python .github/scripts/verify-windows-runner.py
       - name: Upload synthetic test diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

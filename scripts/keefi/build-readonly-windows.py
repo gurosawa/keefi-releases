@@ -21,7 +21,8 @@ SUITES = ("kiwoom", "kiwoom_trading", "retired_connections", "connection_form", 
           "chart_side_panel", "market_candles_view", "chart_market_context")
 FORM_CASES = ("kiwoomFilePairIsValidatedBeforeUpdatingEitherField",
               "suspendedBrokersRejectNewAndExistingCredentials", "stockChartChooserUsesLiveBrokersAndReturnsToChart")
-WINDOW_CASES = ("brokerConnectionReturnsToOrigin", "suspendedBrokersKeepOnlyRemovalAction")
+WINDOW_CASES = ("brokerConnectionReturnsToOrigin", "suspendedBrokersKeepOnlyRemovalAction",
+                "injectedTrayKeepsCloseRunningAndPreferenceOffQuits")
 
 
 def require(condition, message):

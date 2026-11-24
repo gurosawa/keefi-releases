@@ -6,6 +6,11 @@
 #include <QFileInfo>
 #include <QTextStream>
 #include <QSet>
+#ifdef Q_OS_WIN
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QSettings>
+#endif
 using namespace keefi;
 
 int main(int argc, char** argv) {
@@ -28,6 +33,23 @@ int main(int argc, char** argv) {
         {"kiwoom", {{"app_key", "synthetic-update-key"}, {"app_secret", "synthetic-update-secret"}}},
         {"toss", {{"client_id", "synthetic-update-id"}, {"client_secret", "synthetic-update-client-secret"}}}
     };
+#ifdef Q_OS_WIN
+    // Both installed production versions load this per-profile Qt setting
+    // before handling a close. A synthetic foreground-only session exits on
+    // WM_CLOSE through LocalWindow::requestQuit instead of hiding in the tray.
+    QSettings settings(QDir(folder).filePath("KEEFI/KEEFI.ini"), QSettings::IniFormat);
+    const QString closeKey = QStringLiteral("chart/alerts/ui/v1");
+    if (seed) {
+        if (!QDir(folder).mkpath("KEEFI")) return 6;
+        const QJsonObject preferences{{"format", "keefi-chart-alert-ui/1"}, {"backgroundEnabled", false},
+            {"closeHintSeen", true}, {"dripIntroSeen", true}, {"reviewedPack", ""}, {"reviewedSha256", ""}};
+        settings.setValue(closeKey, QJsonDocument(preferences).toJson(QJsonDocument::Compact));
+        settings.sync();
+    }
+    const auto closePolicy = QJsonDocument::fromJson(settings.value(closeKey).toByteArray()).object();
+    if (settings.status() != QSettings::NoError || !closePolicy.value("backgroundEnabled").isBool()
+        || closePolicy.value("backgroundEnabled").toBool() || !closePolicy.value("closeHintSeen").toBool()) return 6;
+#endif
     if (seed) {
         if (!vault.create(password, &error)) return failed();
         for (auto it = credentials.begin(); it != credentials.end(); ++it) {

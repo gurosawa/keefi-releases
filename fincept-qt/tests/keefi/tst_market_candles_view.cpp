@@ -727,7 +727,8 @@ void MarketCandlesViewTest::realPublicCandlesRenderForReview(){
     if(binance||!dark)return;
     // Crosshair: price and time boxes on the axes, OHLC legend for the hovered candle.
     auto* chart=view.findChild<QWidget*>("marketCandlesChart");QVERIFY(chart);const QPoint hover(int(chart->width()*.55),int(chart->height()*.45));
-    QTest::mouseMove(chart,hover);QTRY_VERIFY(!chart->property("hoverSummary").toString().isEmpty());
+    QMouseEvent hoverMove(QEvent::MouseMove,hover,chart->mapToGlobal(hover),Qt::NoButton,Qt::NoButton,Qt::NoModifier);
+    QApplication::sendEvent(chart,&hoverMove);QTRY_VERIFY(!chart->property("hoverSummary").toString().isEmpty());
     QVERIFY(view.grab().save(QDir(out).filePath(QString::fromLatin1(QTest::currentDataTag())+"-hover.png")));
     // One horizontal line and one trend line; the tool returns to the cursor after each.
     QTest::mouseClick(view.findChild<QToolButton*>("chartDrawingTool_horizontal"),Qt::LeftButton);QTest::mouseClick(chart,Qt::LeftButton,Qt::NoModifier,QPoint(int(chart->width()*.5),int(chart->height()*.3)));

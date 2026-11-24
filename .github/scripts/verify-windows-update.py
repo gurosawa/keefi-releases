@@ -1,5 +1,6 @@
 """Exercise the installed Windows updater against a disposable 111 application and encrypted profile."""
 import ctypes
+from contextlib import contextmanager
 from ctypes import wintypes
 import hashlib
 import os
@@ -29,7 +30,6 @@ user.GetWindowThreadProcessId.argtypes = (wintypes.HWND,ctypes.POINTER(wintypes.
 user.IsWindowVisible.argtypes = (wintypes.HWND,)
 user.GetWindowTextW.argtypes = (wintypes.HWND,wintypes.LPWSTR,ctypes.c_int)
 user.PostMessageW.argtypes = (wintypes.HWND,wintypes.UINT,wintypes.WPARAM,wintypes.LPARAM)
-user.PostThreadMessageW.argtypes = (wintypes.DWORD,wintypes.UINT,wintypes.WPARAM,wintypes.LPARAM)
 
 
 def digest(file):
@@ -51,7 +51,9 @@ def window(exe, wanted_pid=None, exclude=0):
             if not kernel.QueryFullProcessImageNameW(handle,0,name,ctypes.byref(size)): return True
             title = ctypes.create_unicode_buffer(512)
             user.GetWindowTextW(hwnd,title,len(title))
-            if (exe is None or Path(name.value)==exe) and "KEEFI" in title.value:
+            is_target = (exe is None and title.value == "KEEFI 업데이트") or (
+                exe is not None and Path(name.value) == exe and title.value.startswith("KEEFI · 자산과 계좌"))
+            if is_target:
                 result.append((hwnd,tid,pid.value))
                 return False
         finally:
@@ -71,16 +73,22 @@ def await_window(exe, wanted_pid=None, exclude=0):
 
 
 def stop_window(info):
-    hwnd,tid,pid=info
-    handle=kernel.OpenProcess(0x100000,False,pid)
-    if not handle: return
+    hwnd,_,pid=info
+    handle=kernel.OpenProcess(0x100000|0x1000,False,pid)
+    if not handle:
+        raise RuntimeError(f"Cannot open fixture app process {pid}")
     try:
-        user.PostMessageW(hwnd,0x0010,0,0)  # WM_CLOSE
-        if kernel.WaitForSingleObject(handle,5000)!=0:
-            # Background-enabled 111 can keep a tray instance on WM_CLOSE.
-            # Quit its GUI event loop; Qt still emits aboutToQuit.
-            user.PostThreadMessageW(tid,0x0012,0,0)  # WM_QUIT
-            assert kernel.WaitForSingleObject(handle,10000)==0
+        # The fixture sets backgroundEnabled=false in the 111/112 profile.
+        # The main window now runs its real bounded save/lock/quit on close.
+        actual=wintypes.DWORD()
+        user.GetWindowThreadProcessId(hwnd,ctypes.byref(actual))
+        if actual.value!=pid or not user.PostMessageW(hwnd,0x0010,0,0):
+            raise RuntimeError(f"Cannot close the fixture main window for process {pid}")
+        if kernel.WaitForSingleObject(handle,30000)!=0:
+            raise RuntimeError(f"Fixture main window did not exit normally (PID {pid})")
+        code=wintypes.DWORD()
+        if not kernel.GetExitCodeProcess(handle,ctypes.byref(code)) or code.value!=0:
+            raise RuntimeError(f"Fixture main window exited with code {code.value} (PID {pid})")
     finally:
         kernel.CloseHandle(handle)
 
@@ -98,13 +106,38 @@ class DetachedUpdater:
         assert self.handle
 
     def wait(self,seconds):
-        try:
-            assert kernel.WaitForSingleObject(self.handle,int(seconds*1000))==0
-            code=wintypes.DWORD()
-            assert kernel.GetExitCodeProcess(self.handle,ctypes.byref(code))
-            return code.value
-        finally:
-            kernel.CloseHandle(self.handle)
+        if kernel.WaitForSingleObject(self.handle,int(seconds*1000))!=0:
+            raise RuntimeError(f"Installer is still active (PID {self.pid})")
+        code=wintypes.DWORD()
+        assert kernel.GetExitCodeProcess(self.handle,ctypes.byref(code))
+        kernel.CloseHandle(self.handle)
+        self.handle=None
+        return code.value
+
+    def settle_after_failure(self):
+        if not self.handle:
+            return
+        deadline=time.monotonic()+90
+        while kernel.WaitForSingleObject(self.handle,250)==0x102 and time.monotonic()<deadline:
+            # A failed helper can wait for its own error dialog to close.
+            notice=window(None,self.pid)
+            if notice:
+                user.PostMessageW(notice[0],0x0010,0,0)
+        self.wait(0)
+
+
+@contextmanager
+def update_fixture_directory(work):
+    temp=Path(tempfile.mkdtemp(prefix="signed-update-",dir=work))
+    try:
+        yield temp
+    except BaseException:
+        # A detached child may still be rolling back or reopening the app.
+        # Keep the disposable runner fixture intact in this case.
+        print(f"Preserved failed synthetic install in {temp}",flush=True)
+        raise
+    else:
+        shutil.rmtree(temp)
 
 
 def helper_process(driver, env, old, exe, archive, sha, version, build, profile, mode):
@@ -126,8 +159,7 @@ def helper_process(driver, env, old, exe, archive, sha, version, build, profile,
 
 
 def verify(work, archive, data):
-    with tempfile.TemporaryDirectory(prefix="signed-update-",dir=work) as temporary:
-        temp=Path(temporary)
+    with update_fixture_directory(work) as temp:
         base=temp/BASE
         subprocess.run(["curl.exe","--fail","--silent","--show-error","--location","--retry","3","--output",base,BASE_URL],
                        check=True,timeout=180)
@@ -162,6 +194,7 @@ def verify(work, archive, data):
         system=Path(os.environ["SystemRoot"])
         env={k:v for k,v in os.environ.items() if not k.upper().startswith(("QT_","QML","KEEFI_","FINIX_"))}
         env.update(PATH=os.pathsep.join(map(str,(system/"System32",system))),QT_QPA_PLATFORM="windows")
+        helpers=[]
         old=subprocess.Popen([exe,"--profile-dir",profile],cwd=temp,env=env)
         try:
             original=await_window(exe,old.pid)
@@ -175,6 +208,7 @@ def verify(work, archive, data):
             try:
                 print("Checking replacement rollback with a locked package DLL",flush=True)
                 fail=helper_process(driver,test_env,old,exe,archive,data["sha256"],data["version"],data["build"],profile,"rollback")
+                helpers.append(fail)
                 stop_window(original)
                 restored=await_window(exe,exclude=old.pid)
                 notice=await_window(None,fail.pid);user.PostMessageW(notice[0],0x0010,0,0)
@@ -188,6 +222,7 @@ def verify(work, archive, data):
             original=await_window(exe,old.pid)
             print("Checking actual replacement and relaunch into the seeded profile",flush=True)
             good=helper_process(driver,test_env,old,exe,archive,data["sha256"],data["version"],data["build"],profile,"install")
+            helpers.append(good)
             stop_window(original)
             assert good.wait(60)==0
             updated=await_window(exe,exclude=old.pid)
@@ -195,10 +230,18 @@ def verify(work, archive, data):
             stop_window(updated)
             subprocess.run([probe,"check",profile],env=test_env,check=True)
             assert before==(digest(vault),digest(marker)) and sentinel.read_bytes()==b"portable-user-file"
-        finally:
+        except BaseException:
+            # Release the fixture-owned old process so its registered updater
+            # can finish. Never terminate the installer mid-replacement.
             if old.poll() is None: old.terminate();old.wait(12)
+            for helper in helpers:
+                try: helper.settle_after_failure()
+                except RuntimeError as issue: print(f"Installer cleanup: {issue}",flush=True)
             leftover=window(exe)
-            if leftover: stop_window(leftover)
+            if leftover:
+                try: stop_window(leftover)
+                except RuntimeError as issue: print(f"App cleanup: {issue}",flush=True)
+            raise
     return {"from":"0.18.0 (111) with test bootstrap","to":data["version"],"build":data["build"],
             "tamper_refused":True,"locked_component_rollback":True,"updated_executable_relaunched":True,
             "same_profile_argument":True,"same_vault_and_marker_sha256":True,"retained_unmanaged_file":True,
